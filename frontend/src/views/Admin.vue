@@ -137,7 +137,7 @@
           </div>
           <el-alert v-if="eligibilityMsg" :title="eligibilityMsg" type="success" show-icon
                     :closable="false" style="margin-top:8px" />
-          <el-table ref="studentTable" :data="students" border style="margin-top:10px">
+          <el-table ref="studentTable" :data="students" border style="margin-top:10px" @sort-change="onStudentSort">
             <el-table-column prop="id" label="ID" width="70" />
             <el-table-column prop="name" label="姓名" width="90" />
             <el-table-column label="初中校" :formatter="fJsStu" width="160" />
@@ -155,8 +155,7 @@
           <el-pagination style="margin-top:10px" layout="total, sizes, prev, pager, next, jumper"
             :total="studentTotal" :current-page="studentPage" :page-size="studentSize" :page-sizes="[50, 100, 200]"
             @current-change="(p) => { studentPage = p; loadStudents() }"
-            @size-change="(s) => { studentSize = s; studentPage = 1; loadStudents() }"
-            @sort-change="onStudentSort" />
+            @size-change="(s) => { studentSize = s; studentPage = 1; loadStudents() }" />
         </el-tab-pane>
 
         <!-- 模拟录取 -->
