@@ -28,21 +28,21 @@
 
       <el-tabs v-model="tab">
         <el-tab-pane label="校额到校志愿" name="QUOTA">
-          <el-table :data="quotaRows" border v-loading="loading">
-            <el-table-column prop="studentId" label="考生ID" width="90" />
-            <el-table-column prop="studentName" label="考生" width="110" />
-            <el-table-column label="初中校" :formatter="fJs" />
-            <el-table-column prop="priority" label="志愿序" width="80" sortable />
-            <el-table-column label="填报高中" :formatter="fHs" />
+          <el-table ref="quotaTable" :data="quotaRows" border v-loading="loading" @sort-change="onSort">
+            <el-table-column prop="studentId" label="考生ID" width="90" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="studentName" label="考生" width="110" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="初中校" :formatter="fJs" prop="juniorSchoolId" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="priority" label="志愿序" width="80" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="填报高中" :formatter="fHs" prop="highSchoolId" sortable="custom" :sort-orders="['ascending','descending']" />
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="统招志愿" name="TONGZHAO">
-          <el-table :data="tongzhaoRows" border v-loading="loading">
-            <el-table-column prop="studentId" label="考生ID" width="90" />
-            <el-table-column prop="studentName" label="考生" width="110" />
-            <el-table-column label="初中校" :formatter="fJs" />
-            <el-table-column prop="priority" label="志愿序" width="80" sortable />
-            <el-table-column label="填报高中" :formatter="fHs" />
+          <el-table ref="tongzhaoTable" :data="tongzhaoRows" border v-loading="loading" @sort-change="onSort">
+            <el-table-column prop="studentId" label="考生ID" width="90" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="studentName" label="考生" width="110" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="初中校" :formatter="fJs" prop="juniorSchoolId" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="priority" label="志愿序" width="80" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="填报高中" :formatter="fHs" prop="highSchoolId" sortable="custom" :sort-orders="['ascending','descending']" />
           </el-table>
         </el-tab-pane>
       </el-tabs>
@@ -73,6 +73,10 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(50)
 const tab = ref('QUOTA')
+// 志愿填报查询排序状态（服务端排序）：prop=字段名，order=ascending/descending/null
+const sort = reactive({ prop: '', order: '' })
+const quotaTable = ref(null)
+const tongzhaoTable = ref(null)
 
 const filters = reactive({ studentName: '', juniorSchoolId: null, batch: '' })
 
@@ -99,10 +103,21 @@ async function load() {
   }
 }
 function search() { page.value = 1; load() }
+// 列排序变化时，重新请求服务端排序
+function onSort({ prop, order }) {
+  sort.prop = prop || ''
+  sort.order = order || ''
+  page.value = 1
+  load()
+}
 function resetFilters() {
   filters.studentName = ''
   filters.juniorSchoolId = null
   filters.batch = ''
+  sort.prop = ''
+  sort.order = ''
+  if (quotaTable.value) quotaTable.value.clearSort()
+  if (tongzhaoTable.value) tongzhaoTable.value.clearSort()
   page.value = 1
   load()
 }

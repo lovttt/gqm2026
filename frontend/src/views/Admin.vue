@@ -77,10 +77,10 @@
             </el-form-item>
           </el-form>
           <el-table :data="quotaSeats" border style="margin-top:10px">
-            <el-table-column prop="id" label="ID" width="70" />
-            <el-table-column label="初中校" :formatter="fJs" />
-            <el-table-column label="高中" :formatter="fHs" />
-            <el-table-column prop="quota" label="名额" width="80" />
+            <el-table-column prop="id" label="ID" width="70" sortable :sort-orders="['ascending','descending']" />
+            <el-table-column label="初中校" :formatter="fJs" sortable :sort-method="(a,b)=>fJs(a).localeCompare(fJs(b),'zh-CN')" :sort-orders="['ascending','descending']" />
+            <el-table-column label="高中" :formatter="fHs" sortable :sort-method="(a,b)=>fHs(a).localeCompare(fHs(b),'zh-CN')" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="quota" label="名额" width="80" sortable :sort-orders="['ascending','descending']" />
             <el-table-column label="操作" width="160">
               <template #default="{ row }">
                 <el-button size="small" :disabled="!(row.juniorSchoolId && row.highSchoolId)" @click="openQsDialog(row)">维护</el-button>
