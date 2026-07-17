@@ -1,5 +1,10 @@
 # GQM2026 · 北京中考东城区志愿填报与录取模拟系统
 
+[![CI](https://github.com/lovttt/gqm2026/actions/workflows/ci.yml/badge.svg)](https://github.com/lovttt/gqm2026/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Java](https://img.shields.io/badge/Java-17-orange)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+
 面向**北京中考东城区**的志愿填报辅助与录取模拟系统。后端为 Spring Boot 微服务，前端为 Vue 3 单页应用，数据使用内嵌 SQLite，开箱即用、无需外部中间件。
 
 核心特性：
@@ -99,7 +104,7 @@ cd backend && mvn test
 cd frontend && npm run build
 ```
 
-CI（`.github/workflows/ci.yml`）在每次 push / PR 到 `master` 时自动执行：后端 `mvn package` 编译打包、前端 `npm install && npm run build`。
+CI（`.github/workflows/ci.yml`）在每次 push / PR 到 `master` 时自动执行：后端 `mvn package`（编译打包 + 运行单元测试，作为质量门禁）、前端 `npm install && npm run build`。测试不通过即 CI 失败。
 
 ## 工程约定
 

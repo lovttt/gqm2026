@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend (Maven build)
+    name: Backend (Maven build + test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,8 +21,8 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-      - name: Build with Maven
-        run: mvn -B -q package -DskipTests
+      - name: Build and test with Maven
+        run: mvn -B package
 
   frontend:
     name: Frontend (npm build)
