@@ -1,0 +1,26 @@
+# 依赖 / 构建产物
+node_modules/
+**/target/
+**/dist/
+build/
+
+# Java / 编译产物
+*.class
+*.jar
+*.war
+*.log
+*.dumpstream
+*.lst
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 本地临时日志
+*.tmp

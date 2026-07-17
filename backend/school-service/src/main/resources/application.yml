@@ -1,0 +1,21 @@
+server:
+  port: 8102
+
+spring:
+  application:
+    name: school-service
+  datasource:
+    url: jdbc:sqlite:./data/school.db?busy_timeout=60000&journal_mode=WAL
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+    open-in-view: false
+
+app:
+  jwt:
+    secret: gqm2026-dongcheng-exam-simulation-secret-key-2026
+

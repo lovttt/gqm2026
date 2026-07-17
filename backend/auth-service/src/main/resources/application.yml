@@ -1,0 +1,21 @@
+server:
+  port: 8101
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:sqlite:./data/auth.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+    open-in-view: false
+
+app:
+  jwt:
+    secret: gqm2026-dongcheng-exam-simulation-secret-key-2026
+    expiration-ms: 86400000

@@ -1,0 +1,30 @@
+server:
+  port: 8103
+
+spring:
+  application:
+    name: student-service
+  datasource:
+    url: jdbc:sqlite:./data/student.db?busy_timeout=60000&journal_mode=WAL
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+    open-in-view: false
+
+app:
+  school-service:
+    base-url: http://localhost:8102
+  auth-service:
+    base-url: http://localhost:8101
+  admin:
+    username: admin
+    password: admin123
+  jwt:
+    secret: gqm2026-dongcheng-exam-simulation-secret-key-2026
+  # 考生生成：每校考生数 = 班数 × 班额（北京标准班额 40，可按需调整）
+  per-class: 40
+
