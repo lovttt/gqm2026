@@ -203,34 +203,34 @@
             <el-descriptions-item label="校额到校录取">{{ stats.quotaAdmitted }}</el-descriptions-item>
             <el-descriptions-item label="统招录取">{{ stats.tongzhaoAdmitted }}</el-descriptions-item>
           </el-descriptions>
-          <el-table :data="results" border>
-            <el-table-column prop="studentName" label="考生" width="100" />
-            <el-table-column label="批次" width="100">
+          <el-table ref="resultTable" :data="results" border @sort-change="onResultSort">
+            <el-table-column prop="studentName" label="考生" width="100" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="批次" width="100" prop="batch" sortable="custom" :sort-orders="['ascending','descending']">
               <template #default="{ row }">{{ row.batch === 'QUOTA' ? '校额到校' : '统招' }}</template>
             </el-table-column>
-            <el-table-column prop="highSchoolName" label="录取高中" />
-            <el-table-column prop="juniorSchoolName" label="来源初中" width="150" />
-            <el-table-column prop="totalScore" label="总分" width="80" />
-            <el-table-column label="校内排名" width="90">
+            <el-table-column prop="highSchoolName" label="录取高中" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="juniorSchoolName" label="来源初中" width="150" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="totalScore" label="总分" width="80" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="校内排名" width="90" prop="schoolRank" sortable="custom" :sort-orders="['ascending','descending']">
               <template #default="{ row }">
                 <span v-if="row.batch === 'QUOTA'">{{ row.schoolRank }}</span>
                 <span v-else>—</span>
               </template>
             </el-table-column>
-            <el-table-column prop="chinese" label="语文" width="56" />
-            <el-table-column prop="math" label="数学" width="56" />
-            <el-table-column prop="english" label="英语" width="56" />
-            <el-table-column prop="physics" label="物理" width="56" />
-            <el-table-column prop="politics" label="道法" width="56" />
-            <el-table-column prop="pe" label="体育" width="56" />
-            <el-table-column label="状态" width="100">
+            <el-table-column prop="chinese" label="语文" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="math" label="数学" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="english" label="英语" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="physics" label="物理" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="politics" label="道法" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column prop="pe" label="体育" width="56" sortable="custom" :sort-orders="['ascending','descending']" />
+            <el-table-column label="状态" width="100" prop="status" sortable="custom" :sort-orders="['ascending','descending']">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ADMITTED' ? 'success' : 'danger'">
                   {{ row.status === 'ADMITTED' ? '录取' : '未录取' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="note" label="说明" />
+            <el-table-column prop="note" label="说明" sortable="custom" :sort-orders="['ascending','descending']" />
           </el-table>
           <el-pagination style="margin-top:10px" layout="total, prev, pager, next" :total="resultTotal"
             :current-page="resultPage" :page-size="resultSize"
@@ -416,6 +416,9 @@ const studentFilters = reactive({
 const resultPage = ref(1)
 const resultSize = ref(20)
 const resultTotal = ref(0)
+// 模拟录取结果表排序（服务端排序）：prop=字段名，order=ascending/descending/null
+const resultSort = reactive({ prop: '', order: '' })
+const resultTable = ref(null)
 
 // 模拟录取结果筛选条件
 const filters = reactive({
@@ -718,10 +721,21 @@ async function loadResults() {
   if (filters.maxScore != null) params.set('maxScore', String(filters.maxScore))
   if (filters.status) params.set('status', filters.status)
   if (filters.studentName && filters.studentName.trim()) params.set('studentName', filters.studentName.trim())
+  if (resultSort.prop && resultSort.order) {
+    const dir = resultSort.order === 'ascending' ? 'asc' : 'desc'
+    params.set('sort', `${resultSort.prop},${dir}`)
+  }
   const r = await request.get(`/admission/results?${params.toString()}`)
   results.value = r.content
   resultTotal.value = r.totalElements
   stats.value = await request.get('/admission/stats')
+}
+// 模拟录取结果表列排序变化时，重新请求服务端排序
+function onResultSort({ prop, order }) {
+  resultSort.prop = prop || ''
+  resultSort.order = order || ''
+  resultPage.value = 1
+  loadResults()
 }
 function searchResults() {
   resultPage.value = 1
@@ -734,6 +748,9 @@ function resetFilters() {
   filters.maxScore = null
   filters.status = null
   filters.studentName = null
+  resultSort.prop = ''
+  resultSort.order = ''
+  if (resultTable.value) resultTable.value.clearSort()
   resultPage.value = 1
   loadResults()
 }
