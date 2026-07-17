@@ -24,3 +24,4 @@ Thumbs.db
 
 # 本地临时日志
 *.tmp
+*.err
