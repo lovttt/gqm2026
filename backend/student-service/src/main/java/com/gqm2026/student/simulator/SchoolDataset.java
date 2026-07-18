@@ -40,6 +40,7 @@ public class SchoolDataset {
         public int tongzhaoQuota;
         public String tier;   // KEY / NORMAL
         public int zone;
+        public String gaokaoTier;   // G7-Q2：TOP / HEAD / MID（nullable，旧快照可能缺）
     }
 
     @Data

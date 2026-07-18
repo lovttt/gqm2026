@@ -1,12 +1,12 @@
 package com.gqm2026.admission.controller;
 
-import com.gqm2026.admission.engine.AdmissionEngine;
+import com.gqm2026.admission.application.AdmissionAppService;
 import com.gqm2026.admission.entity.AdmissionResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.Map;
 
@@ -15,24 +15,24 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdmissionController {
 
-    private final AdmissionEngine admissionEngine;
+    private final AdmissionAppService admissionAppService;
 
     /** 一键顺序模拟：校额到校 -> 统招 */
     @PostMapping("/run/full")
     public Map<String, Object> runFull() {
-        return admissionEngine.runFull();
+        return admissionAppService.runFull();
     }
 
     /** 仅跑校额到校批次 */
     @PostMapping("/run/quota")
     public Map<String, Object> runQuota() {
-        return admissionEngine.runQuotaOnly();
+        return admissionAppService.runQuotaOnly();
     }
 
     /** 仅跑统招批次（以已录取的校额到校考生为豁免） */
     @PostMapping("/run/tongzhao")
     public Map<String, Object> runTongzhao() {
-        return admissionEngine.runTongzhaoOnly();
+        return admissionAppService.runTongzhaoOnly();
     }
 
     @GetMapping("/results")
@@ -43,34 +43,34 @@ public class AdmissionController {
                                           @RequestParam(required = false) Integer maxScore,
                                           @RequestParam(required = false) String status,
                                           @RequestParam(required = false) String studentName) {
-        return admissionEngine.results(pageable, juniorSchoolId, highSchoolId, minScore, maxScore, status, studentName);
+        return admissionAppService.results(pageable, juniorSchoolId, highSchoolId, minScore, maxScore, status, studentName);
     }
 
     @GetMapping("/results/student/{studentId}")
     public List<AdmissionResult> resultsByStudent(@PathVariable Long studentId) {
-        return admissionEngine.resultsByStudent(studentId);
+        return admissionAppService.resultsByStudent(studentId);
     }
 
     @GetMapping("/stats")
     public Map<String, Object> stats() {
-        return admissionEngine.currentStats();
+        return admissionAppService.currentStats();
     }
 
     /** 列出全部历史模拟运行（含每轮统计），用于多次模拟对比 */
     @GetMapping("/runs")
     public List<Map<String, Object>> runs() {
-        return admissionEngine.runs();
+        return admissionAppService.runs();
     }
 
     /** 查看某一次模拟运行的录取结果 */
     @GetMapping("/runs/{runId}")
     public List<AdmissionResult> resultsByRun(@PathVariable Long runId) {
-        return admissionEngine.resultsByRun(runId);
+        return admissionAppService.resultsByRun(runId);
     }
 
     /** 按高中聚合最近一次模拟运行的录取情况（各校计划/录取/分数线/满额率） */
     @GetMapping("/results/summary-by-school")
     public List<Map<String, Object>> summaryBySchool() {
-        return admissionEngine.summaryBySchool();
+        return admissionAppService.summaryBySchool();
     }
 }

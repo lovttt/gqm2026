@@ -57,7 +57,7 @@
 4. N=0（该校无名额）→ 该校无人具资格。
 5. 低于控制线者一律无资格（不计入前 N）。
 
-### QuotaSeatControllerTest（school-service，纯 Mock，阶段1 新增 🔶）
+### QuotaSeatControllerTest（school-service，纯 Mock，阶段1 新增（已实现））
 > 前提：school-service `pom.xml` 补 `spring-boot-starter-test`（当前缺失，见阶段1）。
 > Mock `QuotaSeatRepository` + `JuniorSchoolRepository`，`@InjectMocks QuotaSeatController`，直接调 `listQuotaSeats(...)`（合并为私有方法，经公开入口触发）。对应 `04 §4.6` / `QuotaGroupConfig`：
 1. 查组内初中校（如「东直门中学」id=1，与「第一六五中学」id=2 同组）→ 返回按 `highSchoolId` 合并的行，`quota` 求和，`juniorSchoolNames` 含两校名且被查校（东直门）排在组标签最前。
@@ -65,18 +65,18 @@
 3. 查某高中且含组初中校 → 组内行合并到 `组标签` 行（`repId` 取组内首个存在 id），其余单列。
 4. `juniorSchoolId + highSchoolId` 同时给 → 走精确 `findByJuniorSchoolIdAndHighSchoolId`，不合并。
 
-### ControlLineControllerTest（school-service，纯 Mock，阶段1 新增 🔶）
+### ControlLineControllerTest（school-service，纯 Mock，阶段1 新增（已实现））
 > Mock `ControlLineRepository`。对应控制线 430（`02`/`03`）：
 1. `GET /school/control-line?type=QUOTA` → 返回种子值 `430`（repo 命中）。
 2. 缺失类型 → 返回 `value=0` 的默认 `ControlLine`（不抛异常、不空指针）。
 3. `POST /school/control-line` upsert：已存在则改值保存、不存在则新建。
 
-### SeedDataServiceBackfillTest（school-service，阶段1 新增 🔶）
+### SeedDataServiceBackfillTest（school-service，阶段1 新增（已实现））
 > 校验 `backfillJuniorSchoolStats()` 幂等回填初中校 `classCount/gradCount`（按 `junior_school.csv` 名称对齐）。对应 `02 §2.6` / 初中校统计：
 1. 首次回填：CSV 含「一中,3,120」→ 该初中校 `classCount=3`、`gradCount=120`。
 2. 重复调用幂等：值不变、不重复插入、不抛异常。
 
-### AuthControllerTest（auth-service，纯 Mock，阶段1 新增 🔶）
+### AuthControllerTest（auth-service，纯 Mock，阶段1 新增（已实现））
 > 前提：auth-service `pom.xml` 补 `spring-boot-starter-test`（当前缺失，见阶段1）。
 > Mock `UserRepository` + `JwtUtil` + `PasswordEncoder`，`@InjectMocks AuthController`。对应 `04` 鉴权：
 1. `POST /auth/login` admin/admin123 → 返回含 `token`（JWT 串）、`role=ADMIN` 的 Map。
@@ -84,12 +84,12 @@
 3. 不存在用户 → 抛 `RuntimeException`。
 4. `POST /auth/register` 新用户 → 返回带 `id` 的 `User`；重名 → 抛 `RuntimeException`；role 默认 `STUDENT`。
 
-### JwtUtilTest（auth-service，纯单测 round-trip，阶段1 新增 🔶）
+### JwtUtilTest（auth-service，纯单测 round-trip，阶段1 新增（已实现））
 > `new JwtUtil()` 经 `ReflectionTestUtils` 注入 `secret`/`expirationMs`，不依赖 Spring 上下文。对应 `04` 鉴权：
 1. `generate(username, role)` → `parse(token).getSubject()==username`、`get("role")==role`。
 2. 非法/被篡改 token → `parse` 抛异常。
 
-### ApplicationSimulatorControllerTest（student-service，纯 Mock，阶段1 新增 🔶，解 D6）
+### ApplicationSimulatorControllerTest（student-service，纯 Mock，阶段1 新增（已实现，解 D6）
 > Mock 模拟器引擎/数据获取，`@InjectMocks` 模拟器控制器。对应 `07 §7.3.3` / `07 §7.4`：
 1. `POST /applications/simulate` → 返回 `{generated:N}`，为未锁定考生生成志愿。
 2. `GET /results/summary-by-school` → 返回各校计划/录取/分数线/满额率统计。
@@ -116,8 +116,8 @@
 | 07 §7.2 | HighSchool.tier/zone、JuniorSchool.zone 字段 | 实体字段 + 种子赋值 + `ApplicationSimulatorTest`（因子生效） | 自动 | ✅ |
 | 07 §7.3.1 | 校额资格门槛（资格+过线）与对口候选 | `ApplicationSimulatorTest`(用例2/3) | 自动 | ✅ |
 | 07 §7.3.2 | 统招按区排名冲稳保分档、不盲目全填重点、≤8 志愿 | `ApplicationSimulatorTest`(用例1/4/5/6) | 自动 | ✅ |
-| 07 §7.3.3 | 提交锁跳过已提交考生 | `regenerateAll` 跳过 `submitted`（控制器契约待补） | 自动 | 🔶 |
-| 07 §7.4 | POST /applications/simulate、GET /results/summary-by-school | 端点已落地（控制器契约测试待补） | 自动 | 🔶 |
+| 07 §7.3.3 | 提交锁跳过已提交考生 | `regenerateAll` 跳过 `submitted`（控制器契约已由 `ApplicationSimulatorControllerTest` 覆盖） | 自动 | ✅ |
+| 07 §7.4 | POST /applications/simulate、GET /results/summary-by-school | 端点已落地（`ApplicationSimulatorControllerTest` 覆盖） | 自动 | ✅ |
 | 04 §4.6 | 列表端点分页（page/size/sort，返回 `Page<T>` 信封，前端读 `content`） | 6.4 手动清单分页项 + 前端翻页 UI（Admin 考生/结果表） | 手动 | ✅ |
 
 ## 6.3 文档-代码一致性检查（MUST）
@@ -157,7 +157,7 @@
 
 ## 6.6 绿灯定义（Definition of Green / DoD）
 满足以下全部条件，harness 视为 **GREEN**，方可发版：
-1. `mvn -o test` 在 admission-service 与 student-service 均 **0 失败、0 错误**（6.1 全部自动测试通过）。
+1. `mvn -o test`（JDK 17）在 **全部 5 个业务/引擎服务**（admission / auth / school / student；gateway 无业务逻辑不计入）均 **0 失败、0 错误**（6.1 全部自动测试通过，见 `00 §0.5` 2026-07-18 阶段1）。
 2. 6.4 手动清单全部勾选通过（或显式记录豁免）。
 3. 6.3 一致性 grep 无偏离；若有偏离，文档已先修订并留痕（00 §0.5）。
 4. 任一 `MUST` 条款缺失对应 harness 检查 → 视为 **RED**，禁止发版。

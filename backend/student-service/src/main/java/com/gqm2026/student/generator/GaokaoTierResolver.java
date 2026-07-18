@@ -16,9 +16,16 @@ public class GaokaoTierResolver {
     /**
      * 解析高考出口梯队。
      *
-     * @param hs 高中视图（含 tier 与 code）
+     * @param hs 高中视图（含 tier、gaokaoTier 与 code）
      */
     public GaokaoTier resolve(ReferenceData.HighSchoolView hs) {
+        if (hs.gaokaoTier() != null && !hs.gaokaoTier().isBlank()) {
+            try {
+                return GaokaoTier.valueOf(hs.gaokaoTier());
+            } catch (IllegalArgumentException ignore) {
+                // 未知值回退 tier 映射
+            }
+        }
         return GaokaoTier.fromTier(hs.tier());
     }
 }

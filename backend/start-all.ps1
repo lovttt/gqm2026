@@ -27,7 +27,7 @@ foreach ($svc in $svcs) {
         -WorkingDirectory (Join-Path $base $svc) `
         -RedirectStandardOutput $log -RedirectStandardError "$svc.err" -WindowStyle Hidden
 }
-Write-Host "等待服务启动（120s，含 5729 考生种子）..."
+Write-Host "等待服务启动（120s，含约 10120 名考生种子）..."
 Start-Sleep -Seconds 120
 
 Write-Host "=== [5/5] 登录 + 生成志愿 + 一键模拟 + 统计 ==="

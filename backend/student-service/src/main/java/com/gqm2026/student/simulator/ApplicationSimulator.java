@@ -2,6 +2,7 @@ package com.gqm2026.student.simulator;
 
 import com.gqm2026.student.entity.Application;
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.ApplicationRepository;
 import com.gqm2026.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ApplicationSimulator {
 
-    private final SchoolDataFetcher schoolDataFetcher;
+    private final SchoolReferencePort schoolReferencePort;
     private final ApplicationRepository applicationRepository;
     private final StudentRepository studentRepository;
 
@@ -42,7 +43,7 @@ public class ApplicationSimulator {
      *  批量收集后一次性写入，避免逐考生长事务导致的 SQLite 写锁争用。 */
     @Transactional
     public int regenerateAll() {
-        ReferenceData ref = schoolDataFetcher.fetch();
+        ReferenceData ref = schoolReferencePort.fetch();
         List<Student> students = studentRepository.findAll();
         List<Application> all = new ArrayList<>();
         for (Student s : students) {

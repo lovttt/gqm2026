@@ -1,9 +1,9 @@
 package com.gqm2026.student.service;
 
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.ApplicationRepository;
 import com.gqm2026.student.repository.StudentRepository;
-import com.gqm2026.student.simulator.SchoolDataFetcher;
 import com.gqm2026.student.simulator.SchoolDataset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,10 +22,11 @@ import java.util.*;
  * 数据来源：
  *  - {@code junior_school.csv}（初中校,班数,毕业生数）：取「班数」列；
  *  - {@code score_segment_2026.csv}（2026 一分一段表，334~500）：作为全区分数分布模板；
- *  - school-service 的初中校（经 {@link SchoolDataFetcher} 拉取）：按 name 对齐 juniorSchoolId。
+ *  - school-service 的初中校（经 {@link SchoolReferencePort} 拉取）：按 name 对齐 juniorSchoolId。
  *
  * 估算口径：每校考生数 = 班数 × 班额（默认 40，北京标准班额）。分数从一分一段表按比例抽取，
  * 因此全区分数分布与真实一致；最低分为一分一段表下限（334）。
+ * 每名考生默认综合素质评价 "B"（达标）、crossDistrict=false（G7-Q3/Q4 占位）。
  */
 @Service
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class StudentGenerator {
 
     private final StudentRepository studentRepository;
     private final ApplicationRepository applicationRepository;
-    private final SchoolDataFetcher schoolDataFetcher;
+    private final SchoolReferencePort schoolReferencePort;
 
     @Value("${app.seed-dir:../data}")
     private String seedDir;
@@ -105,6 +106,8 @@ public class StudentGenerator {
                         .chinese(sub[0]).math(sub[1]).english(sub[2])
                         .physics(sub[3]).politics(sub[4]).pe(sub[5])
                         .hasQuotaEligibility(score >= 430)
+                        .comprehensiveEval("B")
+                        .crossDistrict(false)
                         .build();
                 batch.add(s); seq++; total++;
                 if (batch.size() >= 1000) {
@@ -124,7 +127,7 @@ public class StudentGenerator {
     /** 解析初中校 name->id：优先 school-service（按 name 对齐），失败回退本地种子顺序 i+1 */
     private Map<String, Long> resolveJuniorSchoolIds() {
         try {
-            SchoolDataset sd = schoolDataFetcher.fetchRaw();
+            SchoolDataset sd = schoolReferencePort.fetchRaw();
             Map<String, Long> m = new HashMap<>();
             if (sd.juniorSchools != null) {
                 for (SchoolDataset.JuniorSchoolInfo j : sd.juniorSchools) m.put(j.name, j.id);

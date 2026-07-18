@@ -13,9 +13,12 @@
 | `/login` | Login.vue | 匿名 | 登录（admin/student） |
 | `/admin` | Admin.vue | ADMIN | 学校/计划/名额/控制线管理、考生管理、触发模拟、结果统计 |
 | `/student` | Student.vue | STUDENT | 成绩展示、志愿填报（QUOTA+TONGZHAO）、录取结果查询 |
+| `/applications` | Application.vue | ADMIN | 志愿管理：按考生查看/编辑志愿，提交锁校验（见 04 §4.4）|
+| `/generator` | Generator.vue | ADMIN/STUDENT | 单考生志愿生成器：参数交互 → 三批次方案 + 校验 + 权重联动对比（见 07 §7.8）|
 
 - 导航守卫：`MUST` 未登录跳 `/login`；角色不符跳对应首页。
 - `MUST`：登录后按 `role` 重定向（ADMIN→/admin，STUDENT→/student）。
+- ✅ **已裁决（见 `08 §5 Q5`）**：`/generator`（Generator.vue）对 **ADMIN/STUDENT 双开放**，后端不额外加角色限制（维持各服务自校验 JWT），与「前端零改动」原则一致；与「角色不符跳对应首页」守卫不冲突（双角色均允许进入）。
 
 ## 5.3 角色视图细节（SHOULD）
 ### 管理员后台（Admin.vue）

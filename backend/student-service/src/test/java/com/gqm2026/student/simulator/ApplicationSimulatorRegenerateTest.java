@@ -2,6 +2,7 @@ package com.gqm2026.student.simulator;
 
 import com.gqm2026.student.entity.Application;
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.ApplicationRepository;
 import com.gqm2026.student.repository.StudentRepository;
 import org.junit.jupiter.api.Test;
@@ -17,11 +18,14 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** regenerateAll 提交锁契约：已 submitted 考生 MUST 被跳过、不被覆盖（对应 07 §7.3.3，阶段1 补 D6） */
+/**
+ * regenerateAll 提交锁契约：已 submitted 考生 MUST 被跳过、不被覆盖（对应 07 §7.3.3，阶段1 补 D6）。
+ * 招生资源由 SchoolReferencePort（ACL 端口）提供，测试以接口 mock 替换原 SchoolDataFetcher（09 §6）。
+ */
 @ExtendWith(MockitoExtension.class)
 class ApplicationSimulatorRegenerateTest {
 
-    @Mock private SchoolDataFetcher schoolDataFetcher;
+    @Mock private SchoolReferencePort schoolReferencePort;
     @Mock private ApplicationRepository applicationRepository;
     @Mock private StudentRepository studentRepository;
 
@@ -57,7 +61,7 @@ class ApplicationSimulatorRegenerateTest {
 
     @Test
     void regenerateAll_skipsSubmittedStudents() {
-        when(schoolDataFetcher.fetch()).thenReturn(buildRef());
+        when(schoolReferencePort.fetch()).thenReturn(buildRef());
         Student s1 = stu(1L, false);
         Student s2 = stu(2L, true);   // 已提交 -> 必须跳过
         Student s3 = stu(3L, false);

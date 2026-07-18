@@ -25,6 +25,10 @@ public class StudentAttributes {
      */
     public String comprehensiveEval(Student student, String requestOverride) {
         if (requestOverride != null && !requestOverride.isBlank()) return requestOverride;
+        if (student != null && student.getComprehensiveEval() != null
+                && !student.getComprehensiveEval().isBlank()) {
+            return student.getComprehensiveEval(); // 优先使用考生真实综合素质评价（G7-Q3）
+        }
         return GeneratorConstants.QUOTA_COMP_EVAL_MIN; // 默认达标
     }
 

@@ -7,7 +7,32 @@ import java.util.stream.Collectors;
 public class ReferenceData {
 
     /** 高中视图：含层次与片区，用于「学校层次偏好」「区域/离家距离」因子 */
-    public record HighSchoolView(Long id, String tier, int zone, int tongzhaoQuota) {}
+    public static class HighSchoolView {
+        public final Long id;
+        public final String tier;
+        public final int zone;
+        public final int tongzhaoQuota;
+        /** G7-Q2：高考出口梯队 TOP / HEAD / MID（nullable，缺省回退 tier 映射） */
+        public final String gaokaoTier;
+
+        public HighSchoolView(Long id, String tier, int zone, int tongzhaoQuota) {
+            this(id, tier, zone, tongzhaoQuota, null);
+        }
+
+        public HighSchoolView(Long id, String tier, int zone, int tongzhaoQuota, String gaokaoTier) {
+            this.id = id;
+            this.tier = tier;
+            this.zone = zone;
+            this.tongzhaoQuota = tongzhaoQuota;
+            this.gaokaoTier = gaokaoTier;
+        }
+
+        public Long id() { return id; }
+        public String tier() { return tier; }
+        public int zone() { return zone; }
+        public int tongzhaoQuota() { return tongzhaoQuota; }
+        public String gaokaoTier() { return gaokaoTier; }
+    }
 
     public final List<HighSchoolView> highSchools;
     public final Map<Long, HighSchoolView> hsById;
@@ -63,7 +88,7 @@ public class ReferenceData {
         List<SchoolDataset.HighSchoolInfo> hsList =
                 sd.highSchools == null ? List.of() : sd.highSchools;
         List<HighSchoolView> hs = hsList.stream()
-                .map(h -> new HighSchoolView(h.id, h.tier, h.zone, h.tongzhaoQuota))
+                .map(h -> new HighSchoolView(h.id, h.tier, h.zone, h.tongzhaoQuota, h.gaokaoTier))
                 .toList();
         Map<Long, HighSchoolView> hsById = hs.stream()
                 .collect(Collectors.toMap(HighSchoolView::id, h -> h));

@@ -30,6 +30,10 @@
 | `05-frontend-contract.md` | 技术栈、页面、角色视图、与 API 映射 | 前端 |
 | `06-quality-harness.md` | 验收标准、测试、手动清单、一致性检查 | 全部 |
 | `07-simulator.md` | 考生志愿模拟器：理性考生策略、因子、算法、端点 | 阶段2 / student-service |
+| `08-doc-code-review-2026-07-18.md` | 【评审稿】文档—代码契约对齐审查（待确认清单 Q1~Q9） | 后端+文档 |
+| `09-ddd-refactor-design-2026-07-18.md` | 【设计稿】DDD 四层重构设计（充血模型+微服务纯粹性+G7 落库） | 后端重构 |
+| `10-system-overview.md` | 当前系统功能全景描述（业务能力/角色/流程/依赖/数据模型/实现状态） | 现状快照·核对 |
+| `11-requirements-implementation-matrix.md` | 需求-实现对照表（12 模块 × 需求预期/当前实现/状态 + 差异说明） | 现状快照·核对 |
 
 ## 0.4 章节状态
 | 章节 | 状态 | 待拷问重点 |
@@ -42,6 +46,10 @@
 | 05 前端 | DRAFT | 页面拆分是否合理？是否需要录取可视化？ |
 | 06 质量 | REVIEWED | 自动化测试已补齐（见 06 §6.1） |
 | 07 模拟器 | REVIEWED | 理性考生策略/冲稳保/因子(层次+片区)已定（见 07 §7.3） |
+| 08 评审稿 | REVIEWED | Q2-Q9 待确认（见 08 §5），Q1 已裁决 |
+| 09 重构设计 | DRAFT | 四层落地后是否需补 L4 统一异常/Request DTO 规范？ |
+| 10 全景描述 | SNAPSHOT | 代码现状快照，供逐项核对；待裁决项指向 08 §5 |
+| 11 需求实现对照 | SNAPSHOT | 12 模块对照；✅#8 同分比较器已补 10 级（03 §3.4）；✅#12 网关无守卫为 Q5 裁决接受；✅#7/#9 共享池口径已文档同步（03 §3.2/04 §4.4）；详见 §2 |
 
 状态图例：`DRAFT`（初稿，待拷问）→ `REVIEWED`（已拷定）→ `LOCKED`（冻结，改动需评审）
 
@@ -70,6 +78,12 @@
 | 2026-07-13 | 04,06,00,school,backend,frontend | 学校管理展示补全：① 初中校管理加 **班数**(`classCount`)/**毕业生数**(`gradCount`) 列 + 编辑表单字段；`JuniorSchool` 实体加两字段（SQLite 不支持 `ALTER ... ADD COLUMN ... NOT NULL`，故标 `@Column(nullable=true)`），`SeedDataService.backfillJuniorSchoolStats()` 每次启动按 `junior_school.csv`（初中校,班数,毕业生数）**名称对齐**回填（幂等），首次播种后亦回填；② 高中校管理表加 **校额到校** 列，前端 `quotaForHs(id)` 对 `quotaSeats` 按 `highSchoolId` 聚合名额合计（与现有统招列并列）。school-service JDK17 重建 + 前端 build 通过；**坑**：改 entity 加 NOT NULL 列致旧 `school.db` 启动崩溃（`Cannot add a NOT NULL column with default value NULL`），需删 `backend/school-service/data/school.db` 重建 schema 并由 CSV 重新播种。实测：初中校 32/32 均有班数+人数（一中 3/120、二分 21/840…），高中校 统招+校额（二中 166/61、五中 170/44…） |
 | 2026-07-18 | 06,00,repo | 阶段0·恢复 Harness 完整性（Doc-First 漂移修复）：① 上轮已落地的 `.github/workflows/ci.yml`（push/PR 至 master 自动跑后端 `mvn -B package` JDK17 + 前端 `npm run build` Node20）此前未在文档留痕，构成 Doc-First 漂移；现 06 §6.8-2 由「建议下一轮补 CI」改为「已定」对齐现状；② 清理 7 个编辑器锁/备份残留 `.LCK*.java~`（admission/auth/student/school 各 security/config 包），仓库噪音消除。文档先改、再清文件，符合 00 §0.2 / 06 §6.3 |
 | 2026-07-18 | 02,06,00,auth,school,student | 阶段1·补齐测试安全网（TDD）+ 修偏离：① school/auth 两服务补 `spring-boot-starter-test` 并新增校额名额分组合并、控制线读取/upsert、种子回填幂等、认证登录/JWT/注册、JWT round-trip 共 7 类测试；② student 补 `ApplicationController.simulateApplications` 控制器契约 + `ApplicationSimulator.regenerateAll` 提交锁跳过已提交考生契约（解 D6 🔶）；③ **修偏离**：`QuotaEligibilityService.recompute` 此前达线即给资格、未限「按初中校名额总数 N 取前 N 名」（违反 02 §2.6 / 06 §6.2），改为 `eligibleHere = min(达线人数, N)`；DoD 由 2/5 服务扩至 5/5（`mvn -o test` JDK17 全绿：auth 7 / school 9 / student 24） |
+| 2026-07-18 | 01,02,04,05,06,07,00,README | 文档-代码契约对齐（grill-with-docs 审查，见 `08-doc-code-review-2026-07-18.md`）：① 修错误 E1-E4——01 §1.1 进程数 6→5、04 §4.3 控制线 `/control-lines`→`/control-line`、04 §4.4 整页保存 `/applications/batch`→`/applications/student/{studentId}`（删 `/students/{id}/applications`）、04 §4.1 错误响应补 400/404 结构化；② 同步过时 O1-O6——02 §2.4 考生数 5729→10120（按班数）、补 Student.submitted / JuniorSchool.classCount+gradCount / AdmissionResult 反规范化列、06 §6.6 绿灯扩至 5 服务、06 §6.1 阶段1 🔶→✅；③ 补遗漏 M1-M8——02 新增 ScoreLine 实体、04 补生成器 `/generator/generate` 与 `/generate` 端点、05 §5.2 补 `/applications`(Application.vue) 与 `/generator`(Generator.vue) 两页、07 §7.8 补单考生生成器描述、README 考生数同步；④ **Q1 已裁决**：贯通批次为演示占位、不录取，README 下调描述、02 §2.2 / 07 §7.5 标注 `guantongPlan` 未接入录取。待确认 Q2-Q9 见 `08 §5` |
+| 2026-07-18 | 00,10（新增现状快照） | 系统功能全景描述落盘（10-system-overview.md）：基于实时代码扫描，按业务能力/角色/流程/外部依赖/数据模型/实现状态六维呈现现状；待裁决项指向 08 §5。DDD 重构（09）已逐服务落地、5 服务单测全绿（auth 7 / school 9 / student 24 / admission 12） |
+| 2026-07-18 | 08,04,05,start-all,00 | 08 评审稿收口：Q2/Q3/Q4/Q6/Q8 标 ✅resolved（随 09 落地：gaokaoTier/comprehensiveEval/crossDistrict 落库、控制线仅 QUOTA、统一错误体 `{message}`）；裁决 Q5（生成器 ADMIN/STUDENT 双开放、后端不额外加角色限制，与前端零改动一致）、Q7（学生数统一 10120 班数口径）、Q9（校额分组本期硬编码）。同步正式 spec：05 §5.2 双开放、04 §4.1/§4.7-2 错误体 `{message}`、start-all.ps1「5729」→「约 10120」；README/02 §2.4 已于 2026-07-13 先行同步。08 全文由「草稿待确认」转为「评审稿·Q1-Q9 已裁决收口」 |
+| 2026-07-18 | 00,11（新增对照表） | 需求-实现对照表落盘（11-requirements-implementation-matrix.md）：12 模块逐项反推"当前代码实现"并对照 docs/spec/01~07 需求预期。状态：#1-#4/#6/#10/#11 ✅一致；#5/#12 ⚠️部分一致（生成器占位项、网关无服务端守卫）；#7/#9 ✅*（引擎共享名额池与 03 §3.2 字面口径漂移、schoolRank 实记共享组排名）；**#8 ❌关键缺失**：`TieBreakComparator` 仅 4 级，违反 03 §3.4 的 10 级链（缺语数外三科/物理+道法/物理/道法/体育），属 Doc-First 触发项，须先修订 03 或代码再留痕 |（见 `09-ddd-refactor-design-2026-07-18.md`，**设计稿/未改代码**）：经 grill 逐层确认三总原则——**微服务纯粹性优先**（不建 gqm-common，`Score`/`Batch`/`AdmissionStatus`/`TieBreakComparator` 各上下文各一份）、**充血模型**（规则内聚实体/VO/领域服务，controller 瘦化）、**G7 本轮落库**；并落地 08 §5 裁决——**Q2** HighSchool 加 `gaokaoTier(TOP/HEAD/MID)`、**Q3** Student 加 `comprehensiveEval(A/B/C/D)` 且纳入真实门槛（**C/D 校额失格、统招不受影响**）、**Q4** Student 加 `crossDistrict`（占位不生效）、**Q6** `guantong` 不落库仅生成器演示输出；四层设计：L1 领域模型（充血行为表）、L2 应用服务（每聚合一 AppService + 显式事务、HTTP 拉取移出 TX）、L3 基础设施（SimulationRun 维持 `max(runId)+1` 派生、配置维持 `@Value`、外部调用端口化 ACL）、L4 接口层（成功响应直通不包装、错误体固定 `{message}` 匹配前端契约、各服务自校验鉴权）——**前端零改动**。实现待确认后逐服务落地（school→student→admission→auth），落地后再按 Doc-First 同步 01/02/04 并留痕 |
+| 2026-07-18 | 11,00 | **#8 修复（Doc-First 代码侧）**：`TieBreakComparator.STEP` 由 4 级补全为与 `03 §3.4` 一致的 **10 级链**（总分→语数外三科→语文→数学→英语→物理+道法→物理→道法→体育→ticketNo），第 10 级 `ticketNo` 确定性兜底保留。`TieBreakComparatorTest` 新增 语数外三科(级2)/物理+道法(级6)/物理(级7)/全序确定性 4 例（共 7 例全绿），`AdmissionEngineTest` 6 例不回归，admission-service `BUILD SUCCESS`。spec `03 §3.4` 本就正确，本次为代码对齐 spec，非 spec 修订；对照表 11 的 #8 状态 ❌→✅，§0.4 章节状态同步更新 |
+| 2026-07-18 | 03,04,11,00 | **#7/#9 文档口径同步（Doc-First）**：`03 §3.2` 校额到校分组改写为「`quotaGroups` 共享名额池（Q9 硬编码）」口径——同一组内多所初中校共用名额池、按 `(共享组 id, highSchoolId)` 汇总 `QuotaSeat.quota`，`schoolRank` 实为「共享组内分数排名」（非单所初中校内排名）；`04 §4.4` 的 `schoolRank` 描述同步改为「共享组内排名」。消除 spec 字面 `(juniorSchoolId,highSchoolId)` 与引擎实现（`AdmissionEngine.runQuota` 的 `groupKeyOf` 共享池聚合）的漂移，对照表 11 的 #7/#9 状态由漂移提示改为已对齐。**#12 裁决留痕**：网关无服务端角色守卫为 Q5 有意裁决（后端不额外加角色限制、前端零改动），对照表 11 #12 状态 ⚠️→✅（裁决接受），代码不改；若未来需防越权直调再评估补服务端守卫（架构增强、非本期契约强制） |
 
 ## 0.6 技术栈总览（约束基线）
 - 前端：Vue 3 + Vite + Pinia + Vue Router + Element Plus + Axios

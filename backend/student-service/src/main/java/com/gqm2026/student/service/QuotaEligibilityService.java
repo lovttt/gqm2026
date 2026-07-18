@@ -1,9 +1,10 @@
 package com.gqm2026.student.service;
 
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.StudentRepository;
-import com.gqm2026.student.simulator.SchoolDataFetcher;
 import com.gqm2026.student.simulator.SchoolDataset;
+import com.gqm2026.student.service.StudentTieBreakComparator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,22 +16,23 @@ import java.util.stream.Collectors;
  * 校额到校资格重算（结合初中校名额总数，见 docs/spec/02 §2.6）。
  *
  * 规则：某初中校被分配的校额名额总数 N = Σ QuotaSeat.quota（该校对所有高中之和）。
- * 对同一初中校内「总分 ≥ 控制线(430)」的考生按 {@link StudentTieBreakComparator} 降序排名，
- * 前 N 名 hasQuotaEligibility=true，其余（含超出前 N、低于控制线者）为 false。
+ * 对同一初中校内「总分 ≥ 控制线(430) 且 综合素质评价 A/B」的考生按 {@link StudentTieBreakComparator} 降序排名，
+ * 前 N 名 hasQuotaEligibility=true，其余（含超出前 N、低于控制线、综合素质 C/D 者）为 false。
  * 达线人数不足 N 时，达线者全部具资格（资格数 = min(N, 达线人数)）；N=0 则该校无人具资格。
+ * 综合素质评价 C/D 校额失格（G7-Q3，统招不受影响，由录取引擎另行判定）。
  */
 @Service
 @RequiredArgsConstructor
 public class QuotaEligibilityService {
 
-    private final SchoolDataFetcher schoolDataFetcher;
+    private final SchoolReferencePort schoolReferencePort;
     private final StudentRepository studentRepository;
     private final StudentTieBreakComparator tieBreak;
 
     /** 结合各初中校名额总数重算全部考生的校额资格，返回按校统计。 */
     @Transactional
     public Map<String, Object> recompute() {
-        SchoolDataset sd = schoolDataFetcher.fetchRaw();
+        SchoolDataset sd = schoolReferencePort.fetchRaw();
         int controlLine = (sd != null && sd.controlLine != null) ? sd.controlLine.value : 0;
 
         // 初中校 -> 名额总数 N（Σ QuotaSeat.quota）
@@ -57,10 +59,11 @@ public class QuotaEligibilityService {
             // 先全部置无资格
             for (Student s : group) s.setHasQuotaEligibility(false);
 
-            // 达线者按 comparator 降序排，取前 N 名（N=该校名额总数）具资格；
-            // 资格数 = min(达线人数, N)，超出前 N 名或未达线者一律无资格（对应 02 §2.6）
+            // 达线 且 综合素质评价 A/B（C/D 校额失格，落实 G7-Q3），按 comparator 降序排，取前 N 名具资格；
+            // 资格数 = min(达线人数, N)，超出前 N 名或未达线/评价不达标者一律无资格（对应 02 §2.6）
             List<Student> passing = group.stream()
                     .filter(s -> s.getTotalScore() >= controlLine)
+                    .filter(s -> !isCompEvalDisqualified(s.getComprehensiveEval()))
                     .sorted(cmp)
                     .collect(Collectors.toList());
             int eligibleHere = Math.min(passing.size(), n);
@@ -88,5 +91,10 @@ public class QuotaEligibilityService {
         result.put("studentTotal", students.size());
         result.put("byJunior", byJunior);
         return result;
+    }
+
+    /** 综合素质评价 C/D 校额失格（G7-Q3） */
+    private static boolean isCompEvalDisqualified(String eval) {
+        return "C".equalsIgnoreCase(eval) || "D".equalsIgnoreCase(eval);
     }
 }

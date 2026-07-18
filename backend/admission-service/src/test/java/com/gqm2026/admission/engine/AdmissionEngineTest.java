@@ -11,7 +11,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,15 +18,15 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+/**
+ * 录取领域服务契约测试。重构后 {@link AdmissionEngine} 不再直连 HTTP，
+ * 由测试方法直接注入 school/student 快照（对应 09 §3.2 端口化）。
+ */
 @ExtendWith(MockitoExtension.class)
 class AdmissionEngineTest {
 
-    @Mock
-    private RestTemplate restTemplate;
     @Mock
     private AdmissionResultRepository resultRepo;
     @Captor
@@ -38,7 +37,7 @@ class AdmissionEngineTest {
 
     @BeforeEach
     void setup() {
-        engine = new AdmissionEngine(restTemplate, resultRepo, tieBreak);
+        engine = new AdmissionEngine(resultRepo, tieBreak);
         // 每次调用返回递增的 runId，模拟多次运行互不覆盖
         AtomicLong counter = new AtomicLong(0);
         when(resultRepo.findLatestRunId()).thenAnswer(inv -> counter.incrementAndGet());
@@ -88,10 +87,7 @@ class AdmissionEngineTest {
                 app(3L, 1L, "TONGZHAO", 1, 10L),
                 app(4L, 2L, "TONGZHAO", 1, 10L));
 
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
-
-        engine.runFull();
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeastOnce()).save(captor.capture());
         List<AdmissionResult> saved = captor.getAllValues();
@@ -123,10 +119,7 @@ class AdmissionEngineTest {
                 app(3L, 2L, "TONGZHAO", 2, 20L),
                 app(4L, 3L, "TONGZHAO", 1, 20L));
 
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
-
-        engine.runFull();
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeastOnce()).save(captor.capture());
         Map<Long, AdmissionResult> byStudent = captor.getAllValues().stream()
@@ -152,11 +145,9 @@ class AdmissionEngineTest {
                 app(2L, 2L, "QUOTA", 1, 10L),
                 app(3L, 1L, "TONGZHAO", 1, 10L),
                 app(4L, 2L, "TONGZHAO", 1, 10L));
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
 
-        engine.runFull();
-        engine.runFull();
+        engine.runFull(ss, st);
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeast(2)).save(captor.capture());
         List<AdmissionResult> all = captor.getAllValues();
@@ -186,10 +177,8 @@ class AdmissionEngineTest {
                 app(2L, 2L, "QUOTA", 1, 10L),
                 app(3L, 1L, "TONGZHAO", 1, 10L),
                 app(4L, 2L, "TONGZHAO", 1, 10L));
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
 
-        engine.runFull();
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeastOnce()).save(captor.capture());
         Set<Long> quotaAdmitted = captor.getAllValues().stream()
@@ -211,10 +200,8 @@ class AdmissionEngineTest {
         st.applications = List.of(
                 app(1L, 1L, "TONGZHAO", 1, 10L),
                 app(2L, 2L, "TONGZHAO", 1, 10L));
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
 
-        engine.runFull();
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeastOnce()).save(captor.capture());
         Map<Long, List<AdmissionResult>> byStudent = captor.getAllValues().stream()
@@ -236,10 +223,8 @@ class AdmissionEngineTest {
         st.applications = List.of(
                 app(1L, 1L, "QUOTA", 1, 10L),
                 app(2L, 1L, "TONGZHAO", 1, 10L));
-        when(restTemplate.getForObject(anyString(), eq(SchoolSnapshot.class))).thenReturn(ss);
-        when(restTemplate.getForObject(anyString(), eq(StudentSnapshot.class))).thenReturn(st);
 
-        engine.runFull();
+        engine.runFull(ss, st);
 
         verify(resultRepo, atLeastOnce()).save(captor.capture());
         Set<String> batches = captor.getAllValues().stream()

@@ -37,4 +37,10 @@ public class HighSchool {
     /** 所属片区(东城区内 1~N)，用于志愿模拟的「区域/离家距离」因子，距离≈|初中校片区-高中片区| */
     @Builder.Default
     private int zone = 1;
+
+    /** 高考出口梯队（G7-Q2）：TOP/HEAD/MID，用于志愿生成器按偏好匹配；种子由 tier 派生，可在高中管理页编辑 */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private GaokaoTier gaokaoTier = GaokaoTier.MID;
 }

@@ -1,6 +1,6 @@
 package com.gqm2026.student.controller;
 
-import com.gqm2026.student.generator.GeneratorService;
+import com.gqm2026.student.application.GeneratorAppService;
 import com.gqm2026.student.generator.dto.GenerateRequest;
 import com.gqm2026.student.generator.dto.GenerateResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class GeneratorController {
 
-    private final GeneratorService generatorService;
+    private final GeneratorAppService generatorAppService;
 
     @PostMapping("/generator/generate")
     public GenerateResponse generate(@RequestBody GenerateRequest request) {
-        return generatorService.generate(request);
+        return generatorAppService.generate(request);
     }
 }

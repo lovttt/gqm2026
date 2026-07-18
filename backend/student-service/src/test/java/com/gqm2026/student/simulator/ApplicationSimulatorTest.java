@@ -2,12 +2,16 @@ package com.gqm2026.student.simulator;
 
 import com.gqm2026.student.entity.Application;
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
+import com.gqm2026.student.repository.ApplicationRepository;
+import com.gqm2026.student.repository.StudentRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 class ApplicationSimulatorTest {
 
@@ -22,7 +26,8 @@ class ApplicationSimulatorTest {
     private static final ReferenceData REF = buildReferenceData();
 
     private final ApplicationSimulator simulator =
-            new ApplicationSimulator(null, null, null);
+            new ApplicationSimulator(mock(SchoolReferencePort.class),
+                    mock(ApplicationRepository.class), mock(StudentRepository.class));
 
     private static ReferenceData buildReferenceData() {
         ReferenceData.HighSchoolView h1 = new ReferenceData.HighSchoolView(1L, "KEY", 1, 120);

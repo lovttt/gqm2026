@@ -2,9 +2,9 @@ package com.gqm2026.student.generator;
 
 import com.gqm2026.student.entity.Student;
 import com.gqm2026.student.generator.dto.*;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.StudentRepository;
 import com.gqm2026.student.simulator.ReferenceData;
-import com.gqm2026.student.simulator.SchoolDataFetcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -16,14 +16,14 @@ import static org.mockito.Mockito.when;
 
 class GeneratorServiceTest {
 
-    private SchoolDataFetcher fetcher;
+    private SchoolReferencePort fetcher;
     private StudentRepository repo;
     private GeneratorService service;
     private static ReferenceData REF;
 
     @BeforeEach
     void setUp() {
-        fetcher = Mockito.mock(SchoolDataFetcher.class);
+        fetcher = Mockito.mock(SchoolReferencePort.class);
         repo = Mockito.mock(StudentRepository.class);
         service = new GeneratorService(repo, fetcher,
                 new ZoneCommuteEstimator(), new GaokaoTierResolver(), new StudentAttributes());

@@ -63,6 +63,7 @@
 
 - 模拟器**只负责产出志愿**；录取仍由 `AdmissionEngine` 按 03 规则执行（校额到校 → 统招平行志愿）。
 - 模拟器产出的志愿结构（batch / priority / highSchoolId）即为引擎 `StudentSnapshot.ApplicationInfo` 的输入，二者契约一致。
+- ⚠️ **贯通批次（GUANTONG）为演示占位，本期不录取**：单考生生成器 `GeneratorController`（`POST /student/generator/generate`，见 04 §4.4）会一并返回 `guantongPlan`，但录取引擎（03）只消费 QUOTA+TONGZHAO，`Application.batch` 仅 `QUOTA`/`TONGZHAO`，`guantongPlan` 不落志愿库、不进录取（与 02 §2.2 一致）。
 
 ## 7.6 测试（见 06 §6.1）
 
@@ -78,3 +79,11 @@
 1. 区域因子当前用「片区差」近似，是否需要真实经纬度 + haversine 距离？
 2. 缺 2025 线学校的回退 `estimateLine`（tier +40 / comp /4）系数是否要随种子规模可调？（仅作回退，主路径用真实 2025 线换算区排名）
 3. 前端「各校录取可视化」(05 DRAFT) 是否在本轮补做？
+
+## 7.8 单考生志愿生成器（GeneratorController，本期已实现）
+> 对应「手填/逐考生辅助」场景，区别于 7.4 的「全量自动模拟」。代码位置：`student-service/.../controller/GeneratorController.java` + `generator/dto/GenerateRequest.java` + `GenerateResponse.java`。
+
+- 端点：`POST /student/generator/generate`（经网关 `/api/student/generator/generate`，见 04 §4.4）。
+- 入参 `GenerateRequest` 关键字段：`commuteLimit`（通勤上限）、`gaokaoTierPref`（高考出口梯队 TOP/HEAD/MID）、`includeCrossDistrict`（跨区投放占位）、`comprehensiveEval`（综合素质评价占位，默认 "B"）、`sprintWeight`/`steadyWeight`/`safetyWeight`（梯度权重，和须=100）、`commutePref`/`gaokaoOutputPref`（偏好权重 0~100），及对比字段 `prev*`（权重联动对比）。
+- 返回 `GenerateResponse`：`quotaPlan`/`tongzhaoPlan`/`guantongPlan`（三批次方案，**guantongPlan 为演示占位、不录取**）、`issues`（校验：通勤超限/梯队不符/贯通门槛 380/梯度权重合计≠100 等）、`filtered`（被过滤学校）、`weightComparison`（权重联动对比）。
+- ⚠️ 半实现项（本期占位，详见 `08 §5` Q2~Q4）：`gaokaoTierPref`/`includeCrossDistrict`/`comprehensiveEval` 在真实数据流未落地，仅作生成器入参与展示。

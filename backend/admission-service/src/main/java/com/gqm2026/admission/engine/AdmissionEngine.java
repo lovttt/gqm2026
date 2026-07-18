@@ -3,40 +3,36 @@ package com.gqm2026.admission.engine;
 import com.gqm2026.admission.dto.SchoolSnapshot;
 import com.gqm2026.admission.dto.StudentSnapshot;
 import com.gqm2026.admission.entity.AdmissionResult;
+import com.gqm2026.admission.entity.AdmissionStatus;
 import com.gqm2026.admission.repository.AdmissionResultRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 录取领域服务（充血）：校额到校 + 统招两个批次的录取计算与结果落库。
+ *
+ * <p>设计约束（G7 / 09 §2.5 / §3.2）：
+ * <ul>
+ *   <li>跨服务 HTTP 拉取（school/student 快照）已移出本服务，由 {@code AdmissionAppService} 经
+ *       {@code SchoolSnapshotPort}/{@code StudentSnapshotPort} 在事务外拉取后传入，本服务只做纯计算 + 落库；</li>
+ *   <li>{@code runXxx} 标注 {@code @Transactional}，一个用例一个事务；</li>
+ *   <li>批次 / 状态判定统一经 {@link com.gqm2026.admission.entity.Batch}/{@link AdmissionStatus} 表达。</li>
+ * </ul>
+ */
 @Service
+@RequiredArgsConstructor
 public class AdmissionEngine {
 
-    private final RestTemplate restTemplate;
     private final AdmissionResultRepository resultRepo;
     private final TieBreakComparator tieBreak;
-
-    @Value("${app.school-service.base-url}")
-    private String schoolBaseUrl;
-    @Value("${app.student-service.base-url}")
-    private String studentBaseUrl;
-
-    public AdmissionEngine(
-            @Qualifier("authedRestTemplate") RestTemplate restTemplate,
-            AdmissionResultRepository resultRepo,
-            TieBreakComparator tieBreak) {
-        this.restTemplate = restTemplate;
-        this.resultRepo = resultRepo;
-        this.tieBreak = tieBreak;
-    }
 
     /** 一次模拟运行的批次号：在最新 runId 基础上 +1，保证多次运行互不覆盖（历史快照） */
     private Long nextRunId() {
@@ -45,30 +41,27 @@ public class AdmissionEngine {
     }
 
     /** 一键顺序模拟：校额到校 -> 统招。每次生成新的 runId，结果追加而非清空。 */
-    public Map<String, Object> runFull() {
+    @Transactional
+    public Map<String, Object> runFull(SchoolSnapshot ss, StudentSnapshot st) {
         Long runId = nextRunId();
         LocalDateTime runAt = LocalDateTime.now();
-        SchoolSnapshot ss = fetchSchool();
-        StudentSnapshot st = fetchStudent();
         Set<Long> quotaAdmitted = runQuota(ss, st, runId, runAt);
         runTongzhao(ss, st, quotaAdmitted, runId, runAt);
         return stats(runId);
     }
 
-    public Map<String, Object> runQuotaOnly() {
+    @Transactional
+    public Map<String, Object> runQuotaOnly(SchoolSnapshot ss, StudentSnapshot st) {
         Long runId = nextRunId();
         LocalDateTime runAt = LocalDateTime.now();
-        SchoolSnapshot ss = fetchSchool();
-        StudentSnapshot st = fetchStudent();
         runQuota(ss, st, runId, runAt);
         return stats(runId);
     }
 
-    public Map<String, Object> runTongzhaoOnly() {
+    @Transactional
+    public Map<String, Object> runTongzhaoOnly(SchoolSnapshot ss, StudentSnapshot st) {
         Long runId = nextRunId();
         LocalDateTime runAt = LocalDateTime.now();
-        SchoolSnapshot ss = fetchSchool();
-        StudentSnapshot st = fetchStudent();
         // 豁免集取「最新一次运行」的校额到校已录取考生，避免跨运行污染
         Long latest = resultRepo.findLatestRunId();
         Set<Long> exempt = (latest == null) ? Set.of() :
@@ -262,7 +255,7 @@ public class AdmissionEngine {
 
     /** 默认返回最新一次模拟运行的结果，支持按毕业学校 / 录取学校 / 分数范围 / 状态 / 姓名过滤 */
     public Page<AdmissionResult> results(Pageable pageable, Long juniorSchoolId, Long highSchoolId,
-                                          Integer minScore, Integer maxScore, String status, String studentName) {
+                                          Integer minScore, Integer maxScore, AdmissionStatus status, String studentName) {
         Long latest = resultRepo.findLatestRunId();
         if (latest == null) return Page.empty(pageable);
         Specification<AdmissionResult> spec = (root, q, cb) -> cb.equal(root.get("runId"), latest);
@@ -278,8 +271,8 @@ public class AdmissionEngine {
         if (maxScore != null) {
             spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("totalScore"), maxScore));
         }
-        if (status != null && !status.isBlank()) {
-            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+        if (status != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status.name()));
         }
         if (studentName != null && !studentName.isBlank()) {
             spec = spec.and((root, q, cb) -> cb.like(root.get("studentName"), "%" + studentName.trim() + "%"));
@@ -330,10 +323,9 @@ public class AdmissionEngine {
     }
 
     /** 按高中聚合最近一次模拟运行的录取情况，用于「查看各校录取情况」 */
-    public List<Map<String, Object>> summaryBySchool() {
+    public List<Map<String, Object>> summaryBySchool(SchoolSnapshot ss) {
         Long latest = resultRepo.findLatestRunId();
         if (latest == null) return List.of();
-        SchoolSnapshot ss = fetchSchool();
         List<AdmissionResult> results = resultRepo.findByRunId(latest);
 
         Map<Long, Integer> tongzhaoPlan = ss.highSchools.stream()
@@ -371,13 +363,5 @@ public class AdmissionEngine {
             list.add(m);
         }
         return list;
-    }
-
-    private SchoolSnapshot fetchSchool() {
-        return restTemplate.getForObject(schoolBaseUrl + "/school/export", SchoolSnapshot.class);
-    }
-
-    private StudentSnapshot fetchStudent() {
-        return restTemplate.getForObject(studentBaseUrl + "/student/export", StudentSnapshot.class);
     }
 }

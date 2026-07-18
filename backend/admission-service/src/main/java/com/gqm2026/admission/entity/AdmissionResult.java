@@ -51,6 +51,11 @@ public class AdmissionResult {
 
     private String note;
 
+    /** 充血行为：是否已被录取（G7-Q7 录取状态判定） */
+    public boolean isAdmitted() {
+        return "ADMITTED".equals(status);
+    }
+
     private LocalDateTime createdAt;
 
     /** 模拟运行批次号（同一 runFull/runQuota/runTongzhao 共享），用于保留多次模拟历史 */

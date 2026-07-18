@@ -20,6 +20,8 @@
 | name | String | MUST |
 | district | String | DEFAULT '东城区' |
 | zone | int | MUST，所属片区(东城区内 1~N)，默认 1（见 07 §7.2「区域/离家距离」因子） |
+| classCount | int | SHOULD，班数（阶段1 起按 `junior_school.csv` 回填，`SeedDataService.backfillJuniorSchoolStats` 幂等；SQLite 不支持 NOT NULL 加列，故 `nullable=true`）|
+| gradCount | int | SHOULD，毕业生数（同上回填）|
 
 ### QuotaSeat（校额到校名额）`quota_seat`
 | 字段 | 类型 | 约束 |
@@ -46,6 +48,15 @@
 | headcount | int | SHOULD，该分数段人数（每 1 分段人数），用于按比例生成考生 |
 | cumulative | Integer | MUST，累计人数（≥该分数的人数）= **区排名**，用于志愿模拟「分数→区排名」换算 |
 
+### ScoreLine（统招线）`score_line`（school 库）
+| 字段 | 类型 | 约束 |
+|------|------|------|
+| id | Long (PK, 自增) | MUST |
+| highSchoolId | Long | MUST，FK→high_school |
+| year | int | MUST，年份（2025 历史统招线，用于换算学校录取排名） |
+| line | int | MUST，该校该年统招录取线（510 量纲） |
+> 代码位置：`school-service/.../entity/ScoreLine.java` + `repository/ScoreLineRepository.java`；被 `07 §7.3.2` 引用换算 2025 区排名。
+
 ### Student（考生）`student`
 | 字段 | 类型 | 约束 |
 |------|------|------|
@@ -56,6 +67,7 @@
 | chinese/math/english/physics/politics/pe | int | MUST，单科成绩 |
 | totalScore | int | **派生值**，见 2.3 |
 | hasQuotaEligibility | boolean | MUST，是否具备校额到校资格。**不再是「总分≥430」的单一布尔，而是结合初中校名额总数派生**：见 2.6「校额资格判定」，由 `POST /student/quota-eligibility/recompute` 重算。 |
+| submitted | boolean | MUST，志愿提交锁（提交后不可增删改志愿）；由 `POST /student/students/{id}/submit` 置 true、`/reopen` 置 false（见 04 §4.4、06 §6.1）|
 
 ### Application（志愿）`application`
 | 字段 | 类型 | 约束 |
@@ -79,11 +91,16 @@
 | runId | 模拟运行批次号（历史快照，见 03 §3.8） |
 | runAt | 本次模拟运行时间 |
 | createdAt | 记录写入时间戳 |
+| schoolRank | Integer | 校内排名：仅 `batch=QUOTA` 且 `ADMITTED` 有值（同初中校竞争同一高中校额名次），其余 null（见 04 §4.5） |
+| juniorSchoolId / juniorSchoolName | Long / String | 来源初中校（反规范化，便于结果页直显，见 04 §4.5） |
+| chinese/math/english/physics/politics/pe | int | 各科得分（反规范化自 student 快照，见 04 §4.5） |
+> 代码位置：`admission-service/.../entity/AdmissionResult.java`；由 `runQuota`/`runTongzhao` 保存时写入。|
 
 ## 2.2 枚举值约定（MUST）
 - `batch`：`QUOTA`（校额到校）、`TONGZHAO`（统招）。
 - `status`：`ADMITTED`、`NOT_ADMITTED`。
 - `ControlLine.type`：本期仅 `QUOTA`。
+- ⚠️ **贯通批次（GUANTONG）为演示占位，本期不录取**：生成器 `GeneratorController` 会产出 `guantongPlan`（与 `quotaPlan`/`tongzhaoPlan` 并列），但录取引擎（03）仅消费 QUOTA+TONGZHAO；`Application.batch` 枚举仅 `QUOTA`/`TONGZHAO`，`guantongPlan` 不入志愿库、不进入录取。README 已据「演示占位」口径下调描述（见 `00 §0.5` 2026-07-18 一致性同步）。
 
 ## 2.3 分数结构与量纲（MUST，真实北京中考满分 510）
 满分 510 = 卷面 400 + 附加 110：
@@ -108,7 +125,7 @@
 
 ## 2.4 派生值与数据来源
 - `Student.totalScore` **MUST** 由 `@PrePersist/@PreUpdate` 计算：`chinese+math+english+physics+politics+pe`，代码不得直接赋值绕过。
-- 系统 `SHOULD` 内置种子数据：`school-service` 播种高中/初中校/校额名额/控制线 + **一分一段表（2025/2026，来自 `backend/data/score_segment_2025.csv` / `score_segment_2026.csv`，幂等）**；`student-service` 由 `2026` 一分一段（≥430 分）按各初中校毕业生数比例生成 **约 5729 名**考生（校额资格 = 总分≥430）。志愿不写死，由模拟器 `POST /applications/simulate` 生成（见 07）。
+- 系统 `SHOULD` 内置种子数据：`school-service` 播种高中/初中校/校额名额/控制线 + **一分一段表（2025/2026，来自 `backend/data/score_segment_2025.csv` / `score_segment_2026.csv`，幂等）**；`student-service` 由 `StudentGenerator` **按各初中校班数 × 班额（默认 40）** 生成 **约 10120 名**考生（班数合计 254 × 40，见 `00 §0.5` 2026-07-13 修订；早期「5729（按一分一段表≥430 比例）」口径已弃用）。志愿不写死，由模拟器 `POST /applications/simulate` 或单考生生成器 `POST /generator/generate` 生成（见 07 §7.4 / §7.8）。
 - 种子生成 **MUST** 体现 2.3 区分度分布：`pe=50`；`politics≈80`（偶尔小扣）；`physics=70+（附加10基本满）`；`english=60+（听力40基本满）`；`chinese/math/物理笔试/英语笔试/道法笔试`按随机分布拉开区分度。
 - `SHOULD` 支持 JSON 整体导入导出（`/school/export`、`/school/import`、`/student/export`、`/student/import`）；`MAY` 支持 CSV 导入考生。
 

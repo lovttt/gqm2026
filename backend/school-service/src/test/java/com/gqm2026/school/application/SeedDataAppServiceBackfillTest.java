@@ -1,4 +1,4 @@
-package com.gqm2026.school.service;
+package com.gqm2026.school.application;
 
 import com.gqm2026.school.entity.HighSchool;
 import com.gqm2026.school.entity.JuniorSchool;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 
 /** 种子回填幂等契约（按 junior_school.csv 名称对齐回填班数/毕业生数，对应 02 §2.6，阶段1） */
 @ExtendWith(MockitoExtension.class)
-class SeedDataServiceBackfillTest {
+class SeedDataAppServiceBackfillTest {
 
     @Mock private HighSchoolRepository highSchoolRepository;
     @Mock private JuniorSchoolRepository juniorSchoolRepository;
@@ -33,10 +33,10 @@ class SeedDataServiceBackfillTest {
     @Mock private ScoreSegmentRepository scoreSegmentRepository;
 
     @InjectMocks
-    private SeedDataService seedService;
+    private SeedDataAppService seedService;
 
     @Test
-    void run_whenAlreadySeeded_backfillsJuniorStatsFromCsv() throws Exception {
+    void seedIfEmpty_whenAlreadySeeded_backfillsJuniorStatsFromCsv() throws Exception {
         // 指向测试资源目录（含 junior_school.csv；分段表 csv 不存在会被 catch 跳过）
         ReflectionTestUtils.setField(seedService, "seedDir", "src/test/resources/seed");
         when(highSchoolRepository.findAll()).thenReturn(List.of(new HighSchool())); // 非空 -> 走回填分支
@@ -44,20 +44,20 @@ class SeedDataServiceBackfillTest {
         when(juniorSchoolRepository.findAll()).thenReturn(List.of(js));
         when(juniorSchoolRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        seedService.run();
+        seedService.seedIfEmpty();
 
         verify(juniorSchoolRepository).save(argThat(s -> s.getName().equals("测试一中")
                 && s.getClassCount() == 3 && s.getGradCount() == 120));
     }
 
     @Test
-    void run_whenAlreadySeeded_idempotentNoDuplicateInsert() throws Exception {
+    void seedIfEmpty_whenAlreadySeeded_idempotentNoDuplicateInsert() throws Exception {
         ReflectionTestUtils.setField(seedService, "seedDir", "src/test/resources/seed");
         when(highSchoolRepository.findAll()).thenReturn(List.of(new HighSchool()));
         JuniorSchool js = JuniorSchool.builder().id(1L).name("测试一中").classCount(3).gradCount(120).build();
         when(juniorSchoolRepository.findAll()).thenReturn(List.of(js));
 
-        seedService.run();
+        seedService.seedIfEmpty();
 
         // 值已一致 -> backfill 不应触发 save
         verify(juniorSchoolRepository, never()).save(any());

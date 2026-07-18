@@ -1,8 +1,8 @@
 package com.gqm2026.student.service;
 
 import com.gqm2026.student.entity.Student;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.repository.StudentRepository;
-import com.gqm2026.student.simulator.SchoolDataFetcher;
 import com.gqm2026.student.simulator.SchoolDataset;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +13,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * 校验「校额到校资格结合初中校名额总数」（对应 02 §2.6 / 04 §4.4）。
+ * 招生资源由 SchoolReferencePort（ACL 端口）提供，测试以接口 mock 替换原 SchoolDataFetcher（09 §6）。
  */
 class QuotaEligibilityServiceTest {
 
@@ -38,12 +39,12 @@ class QuotaEligibilityServiceTest {
     }
 
     private QuotaEligibilityService build(List<Student> students, SchoolDataset sd) {
-        SchoolDataFetcher fetcher = mock(SchoolDataFetcher.class);
-        when(fetcher.fetchRaw()).thenReturn(sd);
+        SchoolReferencePort port = mock(SchoolReferencePort.class);
+        when(port.fetchRaw()).thenReturn(sd);
         StudentRepository repo = mock(StudentRepository.class);
         when(repo.findAll()).thenReturn(students);
         when(repo.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        return new QuotaEligibilityService(fetcher, repo, new StudentTieBreakComparator());
+        return new QuotaEligibilityService(port, repo, new StudentTieBreakComparator());
     }
 
     @Test

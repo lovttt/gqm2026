@@ -1,31 +1,46 @@
-package com.gqm2026.auth.controller;
+package com.gqm2026.auth.application;
 
+import com.gqm2026.auth.dto.LoginRequest;
+import com.gqm2026.auth.dto.RegisterRequest;
 import com.gqm2026.auth.entity.User;
 import com.gqm2026.auth.repository.UserRepository;
 import com.gqm2026.auth.security.JwtUtil;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/** 认证控制器契约测试（登录/JWT/注册/角色，对应 04 鉴权，阶段1） */
+/**
+ * 认证应用服务契约测试（登录/JWT/注册/角色，对应 04 鉴权）。
+ * 校验逻辑内聚到 AuthAppService，测试从 controller 迁移至此（09 §6）。
+ */
 @ExtendWith(MockitoExtension.class)
-class AuthControllerTest {
+class AuthAppServiceTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private JwtUtil jwtUtil;
-    @Mock private PasswordEncoder passwordEncoder;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private JwtUtil jwtUtil;
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
-    @InjectMocks
-    private AuthController controller;
+    private AuthAppService app;
+
+    @BeforeEach
+    void setup() {
+        app = new AuthAppService(userRepository, jwtUtil, passwordEncoder);
+    }
 
     @Test
     void login_success_returnsJwtAndRole() {
@@ -34,7 +49,7 @@ class AuthControllerTest {
         when(passwordEncoder.matches("admin123", "enc")).thenReturn(true);
         when(jwtUtil.generate("admin", "ADMIN")).thenReturn("jwt-token");
 
-        Map<String, Object> r = controller.login(new AuthController.LoginReq("admin", "admin123"));
+        Map<String, Object> r = app.login(new LoginRequest("admin", "admin123"));
 
         assertEquals("jwt-token", r.get("token"));
         assertEquals("ADMIN", r.get("role"));
@@ -48,14 +63,14 @@ class AuthControllerTest {
         when(passwordEncoder.matches("wrong", "enc")).thenReturn(false);
 
         assertThrows(RuntimeException.class,
-                () -> controller.login(new AuthController.LoginReq("admin", "wrong")));
+                () -> app.login(new LoginRequest("admin", "wrong")));
     }
 
     @Test
     void login_unknownUser_throws() {
         when(userRepository.findByUsername("nobody")).thenReturn(Optional.empty());
         assertThrows(RuntimeException.class,
-                () -> controller.login(new AuthController.LoginReq("nobody", "x")));
+                () -> app.login(new LoginRequest("nobody", "x")));
     }
 
     @Test
@@ -68,7 +83,7 @@ class AuthControllerTest {
             return u;
         });
 
-        User r = controller.register(new AuthController.RegisterReq("newbie", "pw", null, null));
+        User r = app.register(new RegisterRequest("newbie", "pw", null, null));
 
         assertEquals(9L, r.getId());
         assertEquals("STUDENT", r.getRole());
@@ -80,6 +95,6 @@ class AuthControllerTest {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(
                 User.builder().id(1L).username("admin").build()));
         assertThrows(RuntimeException.class,
-                () -> controller.register(new AuthController.RegisterReq("admin", "x", "STUDENT", null)));
+                () -> app.register(new RegisterRequest("admin", "x", "STUDENT", null)));
     }
 }

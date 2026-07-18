@@ -3,8 +3,8 @@ package com.gqm2026.student.generator;
 import com.gqm2026.student.entity.Student;
 import com.gqm2026.student.generator.dto.*;
 import com.gqm2026.student.repository.StudentRepository;
+import com.gqm2026.student.infrastructure.acl.SchoolReferencePort;
 import com.gqm2026.student.simulator.ReferenceData;
-import com.gqm2026.student.simulator.SchoolDataFetcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,7 +34,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class GeneratorService {
 
     private final StudentRepository studentRepository;
-    private final SchoolDataFetcher schoolDataFetcher;
+    private final SchoolReferencePort schoolReferencePort;
     private final CommuteEstimator commuteEstimator;
     private final GaokaoTierResolver gaokaoTierResolver;
     private final StudentAttributes studentAttributes;
@@ -45,7 +45,7 @@ public class GeneratorService {
     public GenerateResponse generate(GenerateRequest req) {
         Student s = studentRepository.findById(req.getStudentId())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "考生不存在"));
-        ReferenceData ref = schoolDataFetcher.fetch();
+        ReferenceData ref = schoolReferencePort.fetch();
         int controlLine = (ref.controlLine > 0) ? ref.controlLine : QUOTA_CONTROL_LINE;
         int score = s.getTotalScore();
         long jsId = s.getJuniorSchoolId() == null ? -1 : s.getJuniorSchoolId();

@@ -17,4 +17,6 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
     List<Student> findByNameContaining(String name);
 
     List<Student> findByHasQuotaEligibilityTrue();
+
+    List<Student> findBySubmittedFalse();
 }

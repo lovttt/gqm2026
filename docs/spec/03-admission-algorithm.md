@@ -16,13 +16,13 @@
 2. `Student.totalScore >= ControlLine(type=QUOTA).value`（全区最低控制线，510 量纲下为 430）
 3. 该考生填报了某高中的 `QUOTA` 志愿
 
-> 说明：`hasQuotaEligibility` 在数据层已按「初中校名额总数 N + 校内排名前 N」派生（02 §2.6），因此进入本批次的都是各初中校校额入围者；本批次再在 `(初中校,高中)` 组内按 `QuotaSeat.quota` 分校额投档录取。
+> 说明：`hasQuotaEligibility` 在数据层已按「初中校名额总数 N + 校内排名前 N」派生（02 §2.6），因此进入本批次的都是各初中校校额入围者。**分段聚合（共享名额池）**：本期（Q9 裁决）校额分组为硬编码配置 `quotaGroups`，同一组内的多所初中校（如「一中/五中分」）共用一个校额名额池、按高中聚合；引擎以组内 canonical id（`groupKeyOf`）替代单 `(juniorSchoolId)` 进行分组与名额汇总，故「校内排名」实为「共享组内排名」。分组口径以 `quotaGroups` 配置为准，而非字面 `(juniorSchoolId, highSchoolId)`。
 
-分组与录取：
-- 按 `(juniorSchoolId, highSchoolId)` 分组，**仅限配额表 `QuotaSeat` 中存在的组合**。
-- 组内 `MUST` 使用 `TieBreakComparator` 降序排序（即「校内排名」）。
+分组与录取（共享名额池口径，对齐 Q9 硬编码分组）：
+- 按 `quotaGroups` 共享组聚合：同一组内多所初中校共用一个校额名额池，按 `(共享组 id, highSchoolId)` 汇总 `QuotaSeat.quota`，**仅限配额表 `QuotaSeat` 中存在的组合**。
+- 组内 `MUST` 使用 `TieBreakComparator` 降序排序（即「共享组内分数排名」）；`rank` 从 1 起递增，写入 `AdmissionResult.schoolRank`。
 - 每组取前 `QuotaSeat.quota` 名录取（`ADMITTED`），其余同组考生进入统招池。
-- `note` `MUST` 记录「校内排名第 N」。
+- `note` `MUST` 记录「共享组内分数排名第 N」（如 `校额到校第{priority}志愿录取（共享组内分数排名第{rank}）`）。
 
 ✅ **已定（拷问结论）**：校额到校**不按志愿序号择优**，仅判定「是否填报了该校」。同一考生对同一高中在 QUOTA 有多条志愿，仅按「是否填报」判定一次，不重复计入分组。
 
