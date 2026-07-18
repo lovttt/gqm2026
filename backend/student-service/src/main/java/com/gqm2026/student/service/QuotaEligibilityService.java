@@ -57,12 +57,13 @@ public class QuotaEligibilityService {
             // 先全部置无资格
             for (Student s : group) s.setHasQuotaEligibility(false);
 
-            // 达线者默认均具备校额到校资格（名额在录取时按共享池自然竞争，不再限制每校前 N 名）
+            // 达线者按 comparator 降序排，取前 N 名（N=该校名额总数）具资格；
+            // 资格数 = min(达线人数, N)，超出前 N 名或未达线者一律无资格（对应 02 §2.6）
             List<Student> passing = group.stream()
                     .filter(s -> s.getTotalScore() >= controlLine)
                     .sorted(cmp)
                     .collect(Collectors.toList());
-            int eligibleHere = passing.size();
+            int eligibleHere = Math.min(passing.size(), n);
             for (int i = 0; i < eligibleHere; i++) {
                 passing.get(i).setHasQuotaEligibility(true);
             }

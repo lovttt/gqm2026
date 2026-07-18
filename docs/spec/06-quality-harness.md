@@ -57,7 +57,45 @@
 4. N=0（该校无名额）→ 该校无人具资格。
 5. 低于控制线者一律无资格（不计入前 N）。
 
-> 运行：`cd backend && mvn -o test`（依赖 `spring-boot-starter-test`，admission/student 两服务均已引入）。
+### QuotaSeatControllerTest（school-service，纯 Mock，阶段1 新增 🔶）
+> 前提：school-service `pom.xml` 补 `spring-boot-starter-test`（当前缺失，见阶段1）。
+> Mock `QuotaSeatRepository` + `JuniorSchoolRepository`，`@InjectMocks QuotaSeatController`，直接调 `listQuotaSeats(...)`（合并为私有方法，经公开入口触发）。对应 `04 §4.6` / `QuotaGroupConfig`：
+1. 查组内初中校（如「东直门中学」id=1，与「第一六五中学」id=2 同组）→ 返回按 `highSchoolId` 合并的行，`quota` 求和，`juniorSchoolNames` 含两校名且被查校（东直门）排在组标签最前。
+2. 查非组初中校 → 返回该校独立名额行（不合并）。
+3. 查某高中且含组初中校 → 组内行合并到 `组标签` 行（`repId` 取组内首个存在 id），其余单列。
+4. `juniorSchoolId + highSchoolId` 同时给 → 走精确 `findByJuniorSchoolIdAndHighSchoolId`，不合并。
+
+### ControlLineControllerTest（school-service，纯 Mock，阶段1 新增 🔶）
+> Mock `ControlLineRepository`。对应控制线 430（`02`/`03`）：
+1. `GET /school/control-line?type=QUOTA` → 返回种子值 `430`（repo 命中）。
+2. 缺失类型 → 返回 `value=0` 的默认 `ControlLine`（不抛异常、不空指针）。
+3. `POST /school/control-line` upsert：已存在则改值保存、不存在则新建。
+
+### SeedDataServiceBackfillTest（school-service，阶段1 新增 🔶）
+> 校验 `backfillJuniorSchoolStats()` 幂等回填初中校 `classCount/gradCount`（按 `junior_school.csv` 名称对齐）。对应 `02 §2.6` / 初中校统计：
+1. 首次回填：CSV 含「一中,3,120」→ 该初中校 `classCount=3`、`gradCount=120`。
+2. 重复调用幂等：值不变、不重复插入、不抛异常。
+
+### AuthControllerTest（auth-service，纯 Mock，阶段1 新增 🔶）
+> 前提：auth-service `pom.xml` 补 `spring-boot-starter-test`（当前缺失，见阶段1）。
+> Mock `UserRepository` + `JwtUtil` + `PasswordEncoder`，`@InjectMocks AuthController`。对应 `04` 鉴权：
+1. `POST /auth/login` admin/admin123 → 返回含 `token`（JWT 串）、`role=ADMIN` 的 Map。
+2. 错误密码 → `login` 抛 `RuntimeException`（无 `@ExceptionHandler`，默认 HTTP 500）。
+3. 不存在用户 → 抛 `RuntimeException`。
+4. `POST /auth/register` 新用户 → 返回带 `id` 的 `User`；重名 → 抛 `RuntimeException`；role 默认 `STUDENT`。
+
+### JwtUtilTest（auth-service，纯单测 round-trip，阶段1 新增 🔶）
+> `new JwtUtil()` 经 `ReflectionTestUtils` 注入 `secret`/`expirationMs`，不依赖 Spring 上下文。对应 `04` 鉴权：
+1. `generate(username, role)` → `parse(token).getSubject()==username`、`get("role")==role`。
+2. 非法/被篡改 token → `parse` 抛异常。
+
+### ApplicationSimulatorControllerTest（student-service，纯 Mock，阶段1 新增 🔶，解 D6）
+> Mock 模拟器引擎/数据获取，`@InjectMocks` 模拟器控制器。对应 `07 §7.3.3` / `07 §7.4`：
+1. `POST /applications/simulate` → 返回 `{generated:N}`，为未锁定考生生成志愿。
+2. `GET /results/summary-by-school` → 返回各校计划/录取/分数线/满额率统计。
+3. 提交锁：已 `submitted` 考生跳过、不被覆盖（`07 §7.3.3` 控制器契约待补 → 本测试补）。
+
+> 运行：`cd backend && mvn -o test`（依赖 `spring-boot-starter-test`，阶段1 后 admission/student/school/auth 四服务引入；gateway 无业务逻辑，仅路由）。
 
 ## 6.2 需求追溯矩阵（spec 条款 → harness 检查）
 | spec 条款 | 要求 | harness 检查 | 类型 | 状态 |
@@ -114,7 +152,8 @@
 - ✅ 录取结果页展示「来源初中」+「各科得分」：`AdmissionResult` 反规范化写入 `juniorSchoolName` 与 `chinese/math/english/physics/politics/pe`（04 §4.5），`Admin.vue`/`Student.vue` 模拟录取结果表新增「来源初中」列与「语文/数学/英语/物理/道法/体育」六列；`Student.vue`「我的成绩」卡片也补「初中校」。`run/full` 重建后已填充（runId=1，录取 4999）。
 - ✅ 模拟录取结果页筛选栏：`GET /results` 支持 `juniorSchoolId`/`highSchoolId`/`minScore`/`maxScore`/`status`/`studentName` 过滤（04 §4.5）；`Admin.vue`「模拟录取」Tab 顶部加筛选表单（毕业学校/录取学校/分数范围/录取状态/考生姓名 + 查询/重置按钮），`loadResults` 经 `URLSearchParams` 拼参。`admission 12/12(JDK17)` 此前全过，本次改动用 `Specification` 实现过滤；前端 `npm run build` 通过。
 - ✅ 各校录取可视化（05 §5.5）：`Admin.vue` 新增「各校录取可视化」Tab，基于 `GET /admission/results/summary-by-school` 用 CSS 柱状图展示各校录取人数（校额+统招堆叠）与两批次占比，附各校明细表。
-- ⚠️ 缺：错误响应结构化（4.7-2）、模拟器控制器契约测试（6.2 中 🔶 项）。
+- ⚠️ 缺：错误响应结构化（4.7-2）。
+- ✅ 阶段1 修复（2026-07-18）：`QuotaEligibilityService.recompute` 此前「达线即给资格、未限前 N 名」偏离 02 §2.6，已改为 `eligibleHere = min(达线人数, N)`（N=该校名额总数），`QuotaEligibilityServiceTest` 4/4 通过（JDK17）；并补齐 school/auth 测试与模拟器控制器契约（解 D6 🔶），DoD 扩至 5/5 服务。
 
 ## 6.6 绿灯定义（Definition of Green / DoD）
 满足以下全部条件，harness 视为 **GREEN**，方可发版：

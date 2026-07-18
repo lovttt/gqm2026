@@ -4,6 +4,8 @@ import com.gqm2026.student.entity.Application;
 import com.gqm2026.student.entity.Student;
 import com.gqm2026.student.repository.ApplicationRepository;
 import com.gqm2026.student.repository.StudentRepository;
+import com.gqm2026.student.service.QuotaEligibilityService;
+import com.gqm2026.student.simulator.ApplicationSimulator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,6 +29,12 @@ class ApplicationControllerTest {
 
     @Mock
     private StudentRepository studentRepository;
+
+    @Mock
+    private ApplicationSimulator simulator;
+
+    @Mock
+    private QuotaEligibilityService quotaEligibilityService;
 
     @InjectMocks
     private ApplicationController controller;
@@ -85,5 +94,16 @@ class ApplicationControllerTest {
         Application r = controller.createApplication(a);
 
         assertNotNull(r);
+    }
+
+    /** 模拟器控制器契约：POST /applications/simulate 返回 {generated:N}（对应 07 §7.4，阶段1 补 D6） */
+    @Test
+    void simulateApplications_returnsGeneratedCount() {
+        when(simulator.regenerateAll()).thenReturn(7);
+
+        Map<String, Object> r = controller.simulateApplications();
+
+        assertEquals(7, r.get("generated"));
+        verify(simulator).regenerateAll();
     }
 }
