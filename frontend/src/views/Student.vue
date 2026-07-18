@@ -28,7 +28,7 @@
 
       <el-card style="margin-bottom:16px">
         <template #header>填报志愿</template>
-        <el-form label-width="140px">
+        <el-form label-width="140px" :disabled="!!(me && me.submitted)">
           <el-divider content-position="left">校额到校志愿（按优先级 1~10 排序，同一学校分数靠前者先挑）</el-divider>
           <el-form-item v-for="(p, i) in quotaApps" :key="'q' + i" :label="'校额志愿 ' + (i + 1)">
             <el-select v-model="quotaApps[i]" placeholder="选择高中" clearable filterable style="width:300px">
@@ -41,7 +41,10 @@
               <el-option v-for="h in highSchools" :key="h.id" :label="h.name" :value="h.id" />
             </el-select>
           </el-form-item>
+          <el-alert v-if="me && me.submitted" type="warning" :closable="false" style="margin-bottom:10px"
+            title="志愿已提交并锁定，如需修改请联系管理员撤回" />
           <el-button type="primary" @click="saveApps">保存志愿</el-button>
+          <el-button type="success" :disabled="!!(me && me.submitted)" @click="submitApps">提交志愿</el-button>
         </el-form>
       </el-card>
 
@@ -131,6 +134,12 @@ async function saveApps() {
   })
   await request.post('/student/applications/student/' + studentId, list)
   ElMessage.success('志愿已保存')
+}
+
+async function submitApps() {
+  await request.post('/student/students/' + studentId + '/submit')
+  if (me.value) me.value.submitted = true
+  ElMessage.success('志愿已提交并锁定')
 }
 
 function logout() {

@@ -103,6 +103,22 @@
           </el-form>
         </el-tab-pane>
 
+        <!-- 用户管理 -->
+        <el-tab-pane label="用户管理" name="users">
+          <div style="margin-bottom:10px">
+            <el-button type="primary" size="small" @click="loadUsers">刷新</el-button>
+            <span class="tip" style="margin-left:8px">系统全部账号（角色 / 关联考生），注册入口见登录页</span>
+          </div>
+          <el-table :data="users" border>
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="username" label="用户名" />
+            <el-table-column prop="role" label="角色" width="100" />
+            <el-table-column label="关联考生" width="100">
+              <template #default="{ row }">{{ row.studentId || '—' }}</template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
         <!-- 考生 -->
         <el-tab-pane label="考生管理" name="stu">
           <el-form :inline="true" style="margin-bottom:10px" @submit.prevent>
@@ -135,6 +151,11 @@
             <el-button type="warning" size="small" @click="recomputeEligibility">按名额重算校额资格</el-button>
             <span class="tip" style="margin-left:8px">校额资格 = 各初中校按名额总数取前 N 名（且过控制线 430）</span>
           </div>
+          <div style="margin-bottom:10px">
+            <el-button size="small" @click="openStuDialog()">新增考生</el-button>
+            <el-button size="small" type="info" @click="simulateApps">模拟未提交考生志愿</el-button>
+            <span class="tip" style="margin-left:8px">模拟：为所有未提交锁定的考生按理性策略自动生成志愿</span>
+          </div>
           <el-alert v-if="eligibilityMsg" :title="eligibilityMsg" type="success" show-icon
                     :closable="false" style="margin-top:8px" />
           <el-table ref="studentTable" :data="students" border style="margin-top:10px" @sort-change="onStudentSort">
@@ -150,6 +171,18 @@
             <el-table-column prop="totalScore" label="总分" width="80" sortable="custom" :sort-orders="['ascending','descending']" />
             <el-table-column prop="hasQuotaEligibility" label="校额资格" width="100" sortable="custom" :sort-orders="['ascending','descending']">
               <template #default="{ row }">{{ row.hasQuotaEligibility ? '具备' : '无' }}</template>
+            </el-table-column>
+            <el-table-column label="志愿状态" width="90">
+              <template #default="{ row }">
+                <el-tag :type="row.submitted ? 'warning' : 'success'">{{ row.submitted ? '已提交' : '未提交' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180">
+              <template #default="{ row }">
+                <el-button size="small" @click="openStuDialog(row)">编辑</el-button>
+                <el-button size="small" type="danger" @click="delStu(row)">删除</el-button>
+                <el-button v-if="row.submitted" size="small" type="warning" @click="reopenStu(row)">撤回</el-button>
+              </template>
             </el-table-column>
           </el-table>
           <el-pagination style="margin-top:10px" layout="total, sizes, prev, pager, next, jumper"
@@ -286,6 +319,71 @@
             </el-col>
           </el-row>
         </el-tab-pane>
+        <!-- 数据备份 -->
+        <el-tab-pane label="数据备份" name="backup">
+          <el-card style="margin-bottom:16px">
+            <template #header>学校数据（高中 / 初中 / 校额名额 / 控制线 / 分段线）</template>
+            <el-button type="primary" size="small" @click="exportSchool">导出学校 JSON</el-button>
+            <el-button type="success" size="small" @click="schoolImportDialog = true">导入学校 JSON</el-button>
+          </el-card>
+          <el-card>
+            <template #header>考生数据（考生 / 志愿）</template>
+            <el-button type="primary" size="small" @click="exportStudent">导出考生 JSON</el-button>
+            <el-button type="success" size="small" @click="studentImportDialog = true">导入考生 JSON</el-button>
+          </el-card>
+        </el-tab-pane>
+
+        <!-- 历史运行对比 -->
+        <el-tab-pane label="历史运行对比" name="history">
+          <div style="margin-bottom:10px">
+            <el-button type="primary" size="small" @click="loadRuns">刷新运行列表</el-button>
+            <span class="tip" style="margin-left:8px">每次模拟录取新生成一个 runId，可对比不同方案</span>
+          </div>
+          <el-table :data="runs" border style="margin-bottom:16px">
+            <el-table-column prop="runId" label="运行ID" width="90" />
+            <el-table-column prop="runAt" label="时间" width="180">
+              <template #default="{ row }">{{ row.runAt || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="total" label="考生总数" width="100" />
+            <el-table-column prop="admitted" label="已录取" width="100" />
+            <el-table-column prop="notAdmitted" label="未录取" width="100" />
+            <el-table-column prop="quotaAdmitted" label="校额录取" width="100" />
+            <el-table-column prop="tongzhaoAdmitted" label="统招录取" width="100" />
+            <el-table-column label="操作" width="240">
+              <template #default="{ row }">
+                <el-button size="small" @click="viewRun(row.runId)">查看结果</el-button>
+                <el-button size="small" type="primary" plain @click="cmpA = row.runId">设为对比A</el-button>
+                <el-button size="small" type="success" plain @click="cmpB = row.runId">设为对比B</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-descriptions v-if="runCmp" :column="3" border>
+            <el-descriptions-item label="指标">运行A / 运行B</el-descriptions-item>
+            <el-descriptions-item :label="'运行A (' + cmpA + ')'">—</el-descriptions-item>
+            <el-descriptions-item :label="'运行B (' + cmpB + ')'">—</el-descriptions-item>
+            <el-descriptions-item label="考生总数">{{ runCmp.a.total }} / {{ runCmp.b.total }}</el-descriptions-item>
+            <el-descriptions-item label="已录取">{{ runCmp.a.admitted }} / {{ runCmp.b.admitted }}</el-descriptions-item>
+            <el-descriptions-item label="未录取">{{ runCmp.a.notAdmitted }} / {{ runCmp.b.notAdmitted }}</el-descriptions-item>
+            <el-descriptions-item label="校额录取">{{ runCmp.a.quotaAdmitted }} / {{ runCmp.b.quotaAdmitted }}</el-descriptions-item>
+            <el-descriptions-item label="统招录取">{{ runCmp.a.tongzhaoAdmitted }} / {{ runCmp.b.tongzhaoAdmitted }}</el-descriptions-item>
+          </el-descriptions>
+          <el-dialog v-model="runResultDialog" :title="'运行 ' + runViewId + ' 录取结果'" width="80%">
+            <el-table :data="runResults" border height="420">
+              <el-table-column prop="studentName" label="考生" width="100" />
+              <el-table-column label="批次" width="100">
+                <template #default="{ row }">{{ row.batch === 'QUOTA' ? '校额到校' : '统招' }}</template>
+              </el-table-column>
+              <el-table-column prop="highSchoolName" label="录取高中" />
+              <el-table-column prop="juniorSchoolName" label="来源初中" width="150" />
+              <el-table-column prop="totalScore" label="总分" width="80" />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'ADMITTED' ? 'success' : 'danger'">{{ row.status === 'ADMITTED' ? '录取' : '未录取' }}</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-dialog>
+        </el-tab-pane>
       </el-tabs>
     </el-main>
 
@@ -362,6 +460,49 @@
       <template #footer>
         <el-button @click="csvDialog = false">取消</el-button>
         <el-button type="primary" @click="importCsv">导入</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 考生新增/编辑 -->
+    <el-dialog v-model="stuDialog" :title="stuForm.id ? '编辑考生' : '新增考生'">
+      <el-form :model="stuForm" label-width="100px">
+        <el-form-item label="姓名"><el-input v-model="stuForm.name" /></el-form-item>
+        <el-form-item label="初中校">
+          <el-select v-model="stuForm.juniorSchoolId" placeholder="选择初中校" filterable style="width:100%">
+            <el-option v-for="j in juniorSchools" :key="j.id" :label="j.name" :value="j.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="语文"><el-input-number v-model="stuForm.chinese" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="数学"><el-input-number v-model="stuForm.math" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="英语"><el-input-number v-model="stuForm.english" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="物理"><el-input-number v-model="stuForm.physics" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="道法"><el-input-number v-model="stuForm.politics" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="体育"><el-input-number v-model="stuForm.pe" :min="0" :max="120" /></el-form-item>
+        <el-form-item label="校额资格"><el-switch v-model="stuForm.hasQuotaEligibility" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="stuDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveStu">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 学校 JSON 导入 -->
+    <el-dialog v-model="schoolImportDialog" title="导入学校 JSON">
+      <p class="tip">粘贴从「导出学校 JSON」得到的完整 JSON 数据</p>
+      <el-input v-model="schoolImportText" type="textarea" :rows="10" placeholder='{"highSchools":[...],"juniorSchools":[...],...}' />
+      <template #footer>
+        <el-button @click="schoolImportDialog = false">取消</el-button>
+        <el-button type="primary" @click="importSchool">导入</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 考生 JSON 导入 -->
+    <el-dialog v-model="studentImportDialog" title="导入考生 JSON">
+      <p class="tip">粘贴从「导出考生 JSON」得到的完整 JSON 数据</p>
+      <el-input v-model="studentImportText" type="textarea" :rows="10" placeholder='{"students":[...],"applications":[...]}' />
+      <template #footer>
+        <el-button @click="studentImportDialog = false">取消</el-button>
+        <el-button type="primary" @click="importStudent">导入</el-button>
       </template>
     </el-dialog>
   </el-container>
@@ -447,6 +588,30 @@ const qsGroupItems = ref([])
 const csvDialog = ref(false)
 const csvText = ref('')
 
+// 用户管理
+const users = ref([])
+// 考生新增/编辑
+const stuDialog = ref(false)
+const stuForm = reactive({ id: null, name: '', juniorSchoolId: null, chinese: 0, math: 0, english: 0, physics: 0, politics: 0, pe: 0, hasQuotaEligibility: false })
+// 数据备份
+const schoolImportDialog = ref(false)
+const schoolImportText = ref('')
+const studentImportDialog = ref(false)
+const studentImportText = ref('')
+// 历史运行对比
+const runs = ref([])
+const cmpA = ref(null)
+const cmpB = ref(null)
+const runResultDialog = ref(false)
+const runViewId = ref(null)
+const runResults = ref([])
+const runCmp = computed(() => {
+  if (!cmpA.value || !cmpB.value) return null
+  const a = runs.value.find(r => String(r.runId) === String(cmpA.value))
+  const b = runs.value.find(r => String(r.runId) === String(cmpB.value))
+  return a && b ? { a, b } : null
+})
+
 const hsForm = reactive({ id: null, name: '', district: '东城区', tongzhaoQuota: 100, quotaAdmitted: 0 })
 const jsForm = reactive({ id: null, name: '', district: '东城区', classCount: 0, gradCount: 0 })
 const qsForm = reactive({ id: null, juniorSchoolId: null, highSchoolId: null, quota: 1 })
@@ -524,6 +689,7 @@ async function loadAll() {
   if (cl && cl.value !== undefined) controlLine.value = cl.value
   await loadStudents()
   await loadViz()
+  await loadUsers()
 }
 
 async function loadQuotaSeats() {
@@ -753,6 +919,104 @@ function resetFilters() {
   if (resultTable.value) resultTable.value.clearSort()
   resultPage.value = 1
   loadResults()
+}
+
+async function loadUsers() {
+  const r = await request.get('/auth/users?size=1000')
+  users.value = Array.isArray(r) ? r : r.content
+}
+
+function openStuDialog(row) {
+  if (row) {
+    Object.assign(stuForm, {
+      id: row.id, name: row.name, juniorSchoolId: row.juniorSchoolId,
+      chinese: row.chinese, math: row.math, english: row.english,
+      physics: row.physics, politics: row.politics, pe: row.pe,
+      hasQuotaEligibility: row.hasQuotaEligibility
+    })
+  } else {
+    Object.assign(stuForm, { id: null, name: '', juniorSchoolId: null, chinese: 0, math: 0, english: 0, physics: 0, politics: 0, pe: 0, hasQuotaEligibility: false })
+  }
+  stuDialog.value = true
+}
+async function saveStu() {
+  const payload = {
+    name: stuForm.name,
+    juniorSchoolId: stuForm.juniorSchoolId,
+    chinese: stuForm.chinese, math: stuForm.math, english: stuForm.english,
+    physics: stuForm.physics, politics: stuForm.politics, pe: stuForm.pe,
+    hasQuotaEligibility: stuForm.hasQuotaEligibility
+  }
+  if (stuForm.id != null) {
+    await request.put('/student/students/' + stuForm.id, payload)
+  } else {
+    await request.post('/student/students', payload)
+  }
+  stuDialog.value = false
+  ElMessage.success('已保存')
+  loadStudents()
+}
+async function delStu(row) {
+  await ElMessageBox.confirm('确认删除该考生？')
+  await request.delete('/student/students/' + row.id)
+  loadStudents()
+}
+async function reopenStu(row) {
+  await ElMessageBox.confirm('确认撤回该考生的志愿提交锁定？撤回后考生可重新编辑志愿。')
+  await request.post('/student/students/' + row.id + '/reopen')
+  ElMessage.success('已撤回提交锁定')
+  loadStudents()
+}
+async function simulateApps() {
+  await ElMessageBox.confirm('将为所有未提交锁定的考生按「理性考生」策略模拟生成志愿，确定？', '模拟志愿', { type: 'warning' })
+  await request.post('/student/applications/simulate')
+  ElMessage.success('未提交考生志愿模拟完成')
+  loadStudents()
+}
+
+function downloadJson(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+async function exportSchool() {
+  const data = await request.get('/school/export')
+  downloadJson(data, 'school-dataset.json')
+  ElMessage.success('学校数据已导出')
+}
+async function importSchool() {
+  let ds
+  try { ds = JSON.parse(schoolImportText.value) } catch (e) { ElMessage.error('JSON 解析失败，请检查格式'); return }
+  await request.post('/school/import', ds)
+  schoolImportDialog.value = false
+  ElMessage.success('学校数据已导入')
+  loadAll()
+}
+async function exportStudent() {
+  const data = await request.get('/student/export')
+  downloadJson(data, 'student-dataset.json')
+  ElMessage.success('考生数据已导出')
+}
+async function importStudent() {
+  let ds
+  try { ds = JSON.parse(studentImportText.value) } catch (e) { ElMessage.error('JSON 解析失败，请检查格式'); return }
+  await request.post('/student/import', ds)
+  studentImportDialog.value = false
+  ElMessage.success('考生数据已导入')
+  loadAll()
+}
+
+async function loadRuns() {
+  runs.value = await request.get('/admission/runs')
+}
+async function viewRun(runId) {
+  runViewId.value = runId
+  runResults.value = await request.get('/admission/runs/' + runId)
+  runResultDialog.value = true
 }
 
 function logout() {

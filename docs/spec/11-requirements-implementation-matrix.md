@@ -1,7 +1,7 @@
 # 11 · 需求-实现对照表（Requirements–Implementation Matrix）
 
 > 性质：**现状快照（SNAPSHOT）**，非约束契约。用于逐项核对「需求预期（docs/spec/01~07）」与「当前代码实现（实时代码反推）」。
-> 生成日期：2026-07-18。需求预期以 `docs/spec/` 各章为权威源；代码实现以本仓库 `backend/`、`frontend/` 当前工作树为准。
+> 生成日期：2026-07-18（含前端 UI 接线补齐同步）。需求预期以 `docs/spec/` 各章为权威源；代码实现以本仓库 `backend/`、`frontend/` 当前工作树为准。
 > 状态图例：✅ 一致 / ⚠️ 部分一致 / ❌ 缺失或不一致。带 `*` 的项见 §2 差异说明。
 
 ## 1. 对照表
@@ -18,7 +18,7 @@
 | 8 | 同分比较器 | `03 §3.4` **10 级链**：总分→语数外三科→语文→数学→英语→物理+道法→物理→道法→体育→ticketNo | `TieBreakComparator.STEP` 已补齐 **10 级**（含语数外三科/物理+道法/物理/道法/体育），第 10 级 `ticketNo` 兜底；`TieBreakComparatorTest` 专项断言 7 例 | ✅ 一致 |
 | 9 | 录取结果查询与可视化 | `/results` 分页+5 维筛选、`/results/student/{id}`、`/stats`、`/runs`、`/runs/{id}`、`/summary-by-school`；反规范化初中+各科；`schoolRank` 仅 QUOTA | 全部端点存在，反规范化字段写入，Specification 筛选，`summaryBySchool` 柱状数据齐全 | ✅ 一致* |
 | 10 | 数据导入导出 | JSON 全量 `/export` `/import`（SHOULD）；CSV 批量考生（MAY） | 各服务 JSON 导出导入齐全；`/import/csv` 考生导入存在 | ✅ 一致 |
-| 11 | 前端角色视图与路由 | 5 页；未登录→login、角色不符→首页；登录按 role 重定向；`/generator` ADMIN/STUDENT 双开放 | `Admin/Student/Application/Generator/Login.vue` 齐；守卫在前端 `router.beforeEmbed` | ✅ 一致 |
+| 11 | 前端角色视图与路由 | 5 页；未登录→login、角色不符→首页；登录按 role 重定向；`/generator` ADMIN/STUDENT 双开放 | `Admin/Student/Application/Generator/Login.vue` 齐；守卫在前端 `router.beforeEach`；本轮补齐 UI 接线（见 §2 #11） | ✅ 一致 |
 | 12 | 网关路由 | `01`：网关 `/api/*`→各服务 `StripPrefix=1` | `GatewayApplication` 仅路由（无鉴权/角色守卫）；鉴权由各后端服务自校验 JWT，角色限制经 Q5 裁决「后端不额外加角色限制」 | ✅ 一致（Q5 裁决） |
 
 ## 2. 差异说明
@@ -27,6 +27,14 @@
 `03 §3.4`（MUST）要求 10 级比较链，原 `TieBreakComparator` 仅实现 4 级，缺失 **语数外三科总分、物理+道法、物理、道法、体育** 5 级。已于 2026-07-18 按 spec 补全 `STEP` 列表为完整 10 级（第 10 级 `ticketNo` 兜底保留），`TieBreakComparatorTest` 新增 语数外三科(级2)/物理+道法(级6)/物理(级7) 及全序确定性断言，连同原 3 例共 7 例全绿，`AdmissionEngineTest` 6 例不回归，admission-service 模块 `BUILD SUCCESS`。
 - 影响：当两名考生 `总分/语文/数学/英语` 全相等、但在物理/道法/体育上有区分时，现按 spec 的语数外三科→物理→道法→体育细分，与 `03 §3.4` 一致（末级不纳入综合素质评价）。
 - 注：spec `03 §3.4` 原本即已正确描述 10 级链，本次是**代码对齐 spec**（非 spec 修订），属 Doc-First 触发项的"代码侧修正"，已在 `00 §0.5` 留痕。
+
+### ✅ #11 前端 UI 接线补齐（本轮，2026-07-18）
+此前若干契约端点仅后端存在、前端无入口，本轮补齐为可操作 UI（前端接线，无后端改动）：
+- `Login.vue`：登录/注册切换，注册表单（用户名/密码/角色 STUDENT|ADMIN/考生 id）→ `POST /auth/register`。
+- `Admin.vue`：新增「用户管理」Tab（`GET /auth/users` 分页）；「数据备份」Tab（`/school/export|import`、`/student/export|import` 接线，导出为浏览器下载 JSON）；「历史运行对比」Tab（`GET /admission/runs` 列表 + `/runs/{id}` 查看结果 + 选 A/B 两轮统计对比）；「考生管理」加单考生新增/编辑/删除、志愿「已提交/未提交」状态列、管理员「撤回」（`POST /student/students/{id}/reopen`）、独立「模拟未提交考生志愿」按钮（`POST /student/applications/simulate`）。
+- `Student.vue`：「提交志愿」按钮（`POST /student/students/{id}/submit`）→ 锁定后表单禁用并提示，管理员可在 Admin 端撤回。
+
+结论：#1–#11 契约端点均有前端入口消费，与 04/05 契约一致；无新增后端端点、无 lint 错误、前端 `npm run build` 通过。
 
 ### ⚠️ #5 生成器占位项
 `gaokaoTierPref`、`comprehensiveEval`、`includeCrossDistrict` 在生成器中仅作入参与展示，真实数据流未全接入（Q2/Q3/Q4 已裁决落库但生成器消费路径仍为默认）。`guantongPlan` 为演示占位、不落志愿库、不录取（与 `02 §2.2`/`07 §7.5` 一致，非 bug）。

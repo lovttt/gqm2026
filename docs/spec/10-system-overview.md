@@ -1,6 +1,6 @@
 # 10 · 当前系统功能全景描述（System Overview）
 
-> 本文档基于 `src/main/java/` 与全部 `application.yml` 的实时代码扫描生成（2026-07-18），用于逐项核对系统现状。
+> 本文档基于 `src/main/java/`、`frontend/src/` 与全部 `application.yml` 的实时代码扫描生成（2026-07-18，含前端 UI 接线补齐），用于逐项核对系统现状。
 > 定位：**现状快照**（非约束契约），与 00/01~09 互为参照；其中"待裁决项"指向 `08-doc-code-review-2026-07-18.md §5`。
 > 架构/数据/算法/接口的权威约束仍以 01~06 为准，DDD 重构基线见 `09-ddd-refactor-design-2026-07-18.md`。
 
@@ -12,6 +12,7 @@
 - **智能志愿生成器**：按考生成绩、片区、离家距离、学校层次/高考梯队偏好，"理性考生"策略一键生成志愿方案（含校验拦截）。
 - **录取模拟引擎**：分数优先、遵循志愿平行投档；校额按"共享名额池(组)"聚合竞争，统招全局平行投档；保留多次模拟历史。
 - **数据导入导出**：各服务 JSON 全量数据集导入/导出，考生 CSV 批量导入。
+- **账号与用户管理**：登录/注册（注册可绑定 `studentId`）、用户列表（角色/关联考生）分页查看。
 
 ## 2. 用户角色
 | 角色 | 来源 | 权限与操作范围 |
@@ -69,7 +70,11 @@
 - 四业务服务 DDD 四层重构：L1 充血实体 / L2 AppService+事务 / L3 Repository+ACL 端口 / L4 瘦 controller + `@RestControllerAdvice` + `DomainException`。
 - 录取引擎双批次算法（含同分比较器 `TieBreakComparator`，首级排序 bug 已修复）、志愿生成器、资格重算、导入导出、JWT 鉴权。
 - G7 字段落库：`gaokaoTier`、`comprehensiveEval`、校额 C/D 失格（统招不受影响）。
-- 全部 52 单测通过（auth 7 / school 9 / student 24 / admission 12）。
+- 前端 UI 接线补齐（本轮）：
+  - `Login.vue`：登录/注册切换，注册含用户名/密码/角色/考生 id（`POST /auth/register`）。
+  - `Admin.vue`：新增「用户管理」Tab（`GET /auth/users` 分页）、「数据备份」Tab（学校/考生 JSON 导出导入接线）、「历史运行对比」Tab（`GET /admission/runs`、`/runs/{id}` + A/B 两轮统计对比）；「考生管理」加单考生新增/编辑/删除、志愿状态列、管理员撤回（`/reopen`）、独立「模拟未提交考生志愿」按钮（`/applications/simulate`）。
+  - `Student.vue`：志愿「提交」按钮（`POST /student/students/{id}/submit`）锁定后表单禁用 + 提示，管理员可撤回。
+- 全部 52 单测通过（auth 7 / school 9 / student 24 / admission 12）。前端 `npm run build` 通过、无 lint 错误。
 
 **骨架 / 占位（接口已定义，逻辑为合理默认）**
 - `Student.crossDistrict`：占位字段，不生效（非目标"跨区招生"）。
