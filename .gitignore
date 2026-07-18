@@ -6,6 +6,7 @@ build/
 
 # Java / 编译产物
 *.class
+*.java~
 *.jar
 *.war
 *.log

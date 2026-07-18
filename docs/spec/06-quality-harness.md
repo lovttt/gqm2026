@@ -130,4 +130,4 @@
 
 ## 6.8 开放问题
 1. ✅ **已定**：自动化测试本期已补齐（见 6.1，含边界/负向与控制器契约）。
-2. 是否引入 CI（GitHub Actions）在 push 时跑 `mvn test` + 前端 build？（建议下一轮补，使 6.6 绿灯可自动门禁）
+2. ✅ **已定**：CI（GitHub Actions）已在 `.github/workflows/ci.yml` 落地，push/PR 至 `master` 时自动跑后端 `mvn -B package`（JDK 17，temurin）与前端 `npm install && npm run build`（Node 20），使 6.6 绿灯可自动门禁（详见 00 §0.5 修订记录）。
